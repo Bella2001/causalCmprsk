@@ -1,0 +1,151 @@
+---
+title: "Nonparametric and Cox-based estimation of ATE in competing risks"
+subtitle: "`causalCmprsk` package"
+author: "Bella Vakulenko-Lagun, Colin Magdamo, Marie-Laure Charpignon, Bang Zheng, Mark Albers, Sudeshna Das"
+date: "`r Sys.Date()`"
+output: 
+  prettydoc::html_pretty:
+        theme: cayman
+        highlight: vignette
+        css: styles.css
+        toc: true
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{Nonparametric and Cox-based estimation of ATE in competing risks}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+The `causalCmprsk` package accompanies the paper of @ADmet and is designed for estimation of average treatment effects (ATE) of two static treatment regimes on time-to-event outcomes with $K\geq 1$ competing events.
+
+# Why `causalCmprsk`?
+***
+
+- It implements both nonparametric estimation (based on the weighted Aalen-Johansen estimator) which does not assume any model for potential outcomes, and Cox-based estimation that relies on the proportional hazards assumption for potential outcomes.
+
+- It provides three measures of treatment effect on time-to-event outcomes: **cause-specific hazard ratios** which are time-dependent measures under nonparametric model, risk-based measures such as **cause-specific risk differences** and **cause-specific risk ratios**, and **restricted-mean-time differences** which quantify how much time on average was lost (or gained) due to treatment by some specified time point. Restricted-mean-time difference is an intuitive summary of treatment effects that translates the treatment effect from the probability (risk) into the time domain and allows to quantify, for example, by how many days or months the treatment speeds up the recovery or postpones death.
+
+- It implements different weights representing different target populations. `ATE` and `stab.ATE` weights aim to estimate average treatment effects for the original population. `ATT` weights target average treatment effects for the population of treated, and `ATC` weights correspond to the population of untreated. `overlap` weights aim to estimate average treatment effects for the **overlap population**, that is the population with the largest equipose regarding the treatment. 
+
+- It uses Bayesian bootstrap for estimation of uncertainty. Bayesian bootstrap is considered a more stable alternative to the simple bootstrap for time-to-event data. We implemented fast parallel computing to  speed up bootstrap replications.
+
+- It can be used for a Randomized Controlled Trials setting when there is no need for emulation of baseline randomization, by using `unadj` option in functions `fit.nonpar` and `fit.cox`.
+
+- It has a function `get.numAtRisk` returning the time-varying number-at-risk  for both "unadjusted" (raw) data, and "weighted" pseudo-population. The number-at-risk statistic can be used for diagnostics of extremely influential weights.
+
+- Competing events can be dependent.
+
+- Data can be right-censored.
+
+
+<!-- cite them?: 
+  Faust, J., Meng, X.-L., & Vittert, L. (2020). A Conversation on COVID-19 with Brief19 Editor-in-Chief and ER Physician Jeremy Faust . Harvard Data Science Review. https://doi.org/10.1162/99608f92.e9b6f961
+-->
+
+
+
+
+# Right Heart Catheterization (RHC) data
+***
+
+We will illustrate how to use `causalCmprsk` package by analyzing data from an observational study on right heart catheterization (RHC) procedure. The data were obtained from \url{http://biostat.mc.vanderbilt.edu/DataSets}.
+
+The RHC data were collected by @Connors with the aim to evaluate the effectiveness and safety of the RHC procedure for critically ill patients admitted to ICUs. The investigators collected an extensive set of covariates in order to adjust for treatment assignment bias. This data set drew attention of many statisticians, and following @Connors, the data were multiply reanalyzed, for example, by @Lin, @Tan2006, @Zaslavsky, @Love, @Mao, @Tchetgen and by many others.
+
+The RHC data contain information on 5735 critically-ill patients who were considered for the RHC procedure on their admission to an ICU. Out of 5735 patients, 2184 did the RHC test and the remaining 3551 did not. The information on their baseline characteristics collected by @Connors is very rich. Additionally, the follow-up on their survival was very long with the maximum follow-up time of 5 years 4 months.
+
+The data were analyzed for different outcomes derived from the original data set. Initially, the interest was in 30-days survival following the RHC procedure or a decision of not doing RHC with a binary outcome of 30-days survival. @Connors, @Zaslavsky and @Tchetgen used this binary outcome.  @Tan2006 used  a survival outcome with censoring at 30 days. 
+@Mao analyzed data for the length-of-stay in an ICU, but without distinguishing whether the end of the stay was due to discharge or in-hospital death, combining by this two opposite outcomes into one. If a discharge from an ICU can be considered as a measure of clinical improvement, then combining two reasons for the end-of-stay into one composite endpoint might be problematic.
+
+In this vignette, we aim to reanalyze the RHC data for the length-of-stay accounting for the reason of the end-of-stay in an ICU. We are interested to estimate the effects of the RHC procedure on two competing outcomes, time to discharge and time to in-hospital death. 
+The [competing risks analysis](#cmprsk) will provide better understanding of the effect of the RHC procedure on overall stay in an ICU - we will compare our results to the findings of @Mao.
+
+We will also analyze the RHC data for [30-days survival](#survival30), regardless of whether a patient died while staying in an ICU or after the discharge. These results then will be compared to the results obtained by @Tan2006.
+
+
+
+# Competing risks framework
+***
+
+## Notation and assumptions
+
+We will introduce the notation and the treatment effect estimands for the RHC data example, where there are two causes of "discharge", due to improvement and due to death. That is the number of competing events $K=2$.
+
+Let $T$ be the lag time from the admission to an ICU and consideration for the RHC procedure to the discharge from an ICU or death in an ICU, whichever comes first.
+And let $E$ be an indicator of the first event, with $E=1$ if $T$ corresponds to discharge, and $E=2$ if $T$ corresponds to death. If neither discharge nor death is observed during the follow-up, $T$ is censored by the time to the last visit, and in this case $E=0$. In our length-of-stay analysis of the RHC data, there is no censoring, and for all the patients (except for 1) the date of the end-of-stay in an ICU is known.
+
+Let $A$ be the treatment assignment random variable with $A=1$ for those who had the RHC procedure and $A=0$ for those who did not have, and $C$ be a vector of covariates.
+
+Let $(T^a, E^a)$, $a=0,1$, be potential outcomes that would be observed if a patient would receive treatment $a$. Our **causal assumptions** are:
+
+1.  **no unmeasured confounding**: treatment assignment $A$ is independent of potential outcomes given $C$. That is, given $C$, $A$ and $(T^0, E^0)$ are independent, and $A$ and $(T^1, E^1)$ are independent;
+
+2. **positivity**: $0<P(A=a\mid C)<1$ for $a=0,1$;
+
+3. **SUTVA (Stable Unit Treatment Value Assumption)**: the outcome of every patient does not depend on the treatment of others (noninterference), and the outcome does not depend on the way a treatment was assigned (consistency).
+
+If there is right censoring in the data, our methods assume that given $A$, the time to the last visit (censoring time) is independent of the outcome $(T,E)$.
+
+
+
+## Treatment effect estimands
+
+
+```{r fig1, echo=FALSE, fig.align="center", label=fig1, fig.cap="Figure 1. A single-world competing risks model with two events, *discharge* and *in-hospital death*.", out.width = '45%'}
+    knitr::include_graphics('RHC_cmp_rsk.png')
+```
+
+In order to introduce treatment effect estimands, we need first to define the single-world  cause-specific hazards of transitioning to states **"1. discharge"** or **"2. in-hospital death"**  ([Figure 1](#fig1)) in a counterfactual world corresponding to treatment $a$:
+$$
+h_k^a(t)=\lim_{\Delta t \to 0} \frac{1}{\Delta t} P(t\leq T^a < t+\Delta t, E^a=k \mid T^a \geq t), \quad k=1,2
+$$
+and the single-world cause-specific cumulative incidence functions (CIF):
+$$
+CIF_a(t, k)=E\left[I_{(T^a \leq t, E^a=k)}\right]=P(T^a \leq t, E^a=k), \quad k=1,2.
+$$
+Hazards $h_k^a(t)$ are usually interpreted as rates of the competing processes, and $CIF_a(t, k)$ are often called **risk** functions - see, e.g., @risk_rate and @cole2. For a more detailed definition of $CIF_a(t, k)$, we refer to @ADmet (Methods section).  
+
+
+### Hazards ratios (HR), risk differences (RD) and risk ratios (RR)
+
+
+The hazard ratios for both events are defined by
+$$
+	HR_k(t)=\frac{h_k^1(t)}{h_k^0(t)}, \quad k=1,2.
+$$
+Notice that here $HR_k(t)$ can depend on $t$ because we do not make any modeling assumptions regarding the hazard functions $h_k^a(t)$. 
+	
+The risk difference functions are defined by
+$$
+RD(t, k)=E\left[I_{(T^1 \leq t, E^1=k)}\right] - E\left[I_{(T^0 \leq t, E^0=k)}\right]= CIF_1(t, k) - CIF_0(t, k), \quad k=1,2.
+$$
+$RD(t,k)$ are between-group differences of probabilities of having an event of type $k$ by time $t$. 
+The risk ratios, respectively, are defined by
+$$
+RR(t, k)=\frac{E\left[I_{(T^1 \leq t, E^1=k)}\right]}{E\left[I_{(T^0 \leq t, E^0=k)}\right]}= \frac{CIF_1(t, k)}{CIF_0(t, k)}, \quad k=1,2.
+$$
+
+
+
+
+
+
+### Restricted mean time (RMT) lost/gained due to treatment
+
+If we want to quantify the effect of treatment in terms of the number of days/months/years gained on average from being treated, then we can "translate" $CIF_a(t, k)$ from probabilities to time domain by using the following Restricted Mean Time functionals
+$RMT_a(\tau, k)$ ($k=1,2$) which are defined by 
+$$
+RMT_a(\tau, k) = \int_0^{\tau} CIF_a(t,k)dt, \quad k=1,2,
+$$
+where $\tau$ is some meaningful prespecified time point. Technically, $RMT_a(\tau, k)$ ($k=1,2$) are the areas under the CIF curves, which can be interpreted as the average "post-event" time. If the event is positive then we would like to see long average "post-event" time
+
+Then, the average treatment effect can be defined as the difference $RMT_1(\tau, k)-RMT_0(\tau, k)$. 
+
+
+
+
+
+# References
+***
+
+
