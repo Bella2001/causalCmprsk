@@ -756,13 +756,11 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   point.res <- list()
   point.res$time <- timepoint
   K <-  length(cmprsk.obj$trt.0) # number of events
-  cat("K=", K, "\n")
   for (k in 1:K)
   {
     point.res$trt.0[[k]] <- list()
     point.res$trt.1[[k]] <- list()
     point.res$trt.eff[[k]] <- list()
-    cat("k=", k, "\n")
     #trt.0
     point.res$trt.0[[k]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CumHaz)
     point.res$trt.0[[k]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CumHaz.CI.L)
@@ -776,7 +774,6 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     point.res$trt.0[[k]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$RMT.CI.L)
     point.res$trt.0[[k]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$RMT.CI.U)
 
-    cat("point 0", "\n")
     # trt.1
     point.res$trt.1[[k]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CumHaz)
     point.res$trt.1[[k]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CumHaz.CI.L)
@@ -790,7 +787,6 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     point.res$trt.1[[k]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$RMT.CI.L)
     point.res$trt.1[[k]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$RMT.CI.U)
 
-    cat("point 1", "\n")
     # trt.eff
     if (length(point.res$trt.eff[[k]]$log.CumHazR)!=1)
     {
@@ -805,7 +801,6 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
       point.res$trt.eff[[k]]$CumHaz.CI.U <- cmprsk.obj$trt.eff[[k]]$log.CumHazR.CI.U
     }
 
-    cat("point 2", "\n")
     point.res$trt.eff[[k]]$RD <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD)
     point.res$trt.eff[[k]]$RD.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD.CI.L)
     point.res$trt.eff[[k]]$RD.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD.CI.U)
@@ -817,11 +812,14 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     point.res$trt.eff[[k]]$ATE.RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT)
     point.res$trt.eff[[k]]$ATE.RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT.CI.L)
     point.res$trt.eff[[k]]$ATE.RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT.CI.U)
-    cat("point 3", "\n")
+
   }
 
   return(point.res)
 }
+
+
+
 
 
 
