@@ -575,7 +575,7 @@ fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, see
       if (wtype!="unadj")
       {
         bs.ps.fit <- get.weights(df, A, C, wtype, case.w = bs.w)
-        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*ps.fit$w, cens=cens, time=time, E.set=E.set)
+        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*bs.ps.fit$w, cens=cens, time=time, E.set=E.set)
       }
       else
         bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w, cens=cens, time=time, E.set=E.set)
