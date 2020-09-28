@@ -271,10 +271,9 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
                                                    ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-  set.seed(seed)
-
   if (bs)
   {
+    set.seed(seed)
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
@@ -552,9 +551,9 @@ fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, see
                                                    ATE.RMT=ATE.RMT)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-  set.seed(seed)
   if (bs)
   {
+    set.seed(seed)
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
