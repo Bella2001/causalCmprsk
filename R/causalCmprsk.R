@@ -31,7 +31,9 @@
 #' @import hrbrthemes
 #' @import magrittr
 #' @import summarytools
-#'
+#' @import future
+#' @import furrr
+#' @import doParallel
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
 #' @useDynLib causalCmprsk, .registration = TRUE

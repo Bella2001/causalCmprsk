@@ -575,7 +575,7 @@ fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, see
       if (wtype!="unadj")
       {
         bs.ps.fit <- get.weights(df, A, C, wtype, case.w = bs.w)
-        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*ps.fit$w, cens=cens, time=time, E.set=E.set)
+        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*bs.ps.fit$w, cens=cens, time=time, E.set=E.set)
       }
       else
         bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w, cens=cens, time=time, E.set=E.set)
@@ -821,7 +821,452 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 
 
 
+# Parallel Cox Fit
 
+boot_comb <- function(x, ...) {
+  # takes each bootstrap iteration and combines it with some logic 
+}
+
+get_os <- function(){
+platform <- .Platform$OS.type
+return(platform)
+}
+
+# if windows (snow)
+if(grepl('win',get_os(),ignore.case = T)) {
+cluster <- makeCluster(3)
+registerDoParallel(cl = cluster)
+}
+
+# if unix (multicore)
+if(grepl('unix|linux',get_os(),ignore.case = T)){
+registerDoParallel(cores = 4)
+}
+
+df <- data.frame(trt = rbinom(100,1,.5),X = rexp(100,1),E = {rbinom(100,1,.3) + 1},C = rbinom(100,1,.7))
+
+# Cox-based estimation:
+#res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="stab.ATE", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+
+demo_parallel_boot <- function(i,df, T, E, A, C, wtype,E.set,cens,time) {
+  X <- df[[T]]
+  E <- df[[E]]
+  nobs <- length(X)
+  trt <- df[[A]]
+  bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
+  bs.w <- bs.w/mean(bs.w)
+    if (wtype!="unadj"){
+        bs.ps.fit <- get.weights(df,A,C,wtype, case.w = bs.w)
+        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*bs.ps.fit$w, cens=cens, time=time, E.set=E.set)
+      }
+    else
+      bs.est <- .estimate.cox(X=X, E=E, trt=df$trt, case.w =bs.w, cens=cens, time=time, E.set=E.set)
+}
+
+
+my_vector <- foreach(i = 1:10) %dopar% demo_parallel_boot(i,df,'X','E','trt',c('C'),'stab.ATE',c(1,2),cens = 0,time = sort(df$X))
+
+# accumulate results
+
+### inside event 1, we have list of 2: logHR is scalar, bh is a dataframe with 2 cols, hazard and time
+### combine logHR into  a vector
+### combine bh, ignore time, combine hazards row for every iteration (rbind)
+
+ # allocate memory for bs results:
+    ntime <- length(res$time)
+    bs.CumHaz <- bs.CIF <- bs.RMT <- list()
+    for (k in E.set)
+    {
+      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
+    }
+
+for (k in E.set)
+      {
+        # CumHaz:
+        bs.time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
+        bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]][i,] <-
+          sapply(time, .get.CIF, bs.time.k,
+                 bs.est[[paste("Ev=", k, sep="")]]$bh$haz)
+        bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]][i,] <-
+          sapply(time, .get.CIF, bs.time.k,
+                 bs.est[[paste("Ev=", k, sep="")]]$bh$haz * exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
+        bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]][i] <- bs.est[[paste("Ev=", k, sep="")]]$logHR
+
+        # CIF
+        bs.bh.k <- .base.haz.std(bs.est[[paste("Ev=", k, sep="")]]$bh)
+        bs.cif.0.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.0) * bs.bh.k$haz)
+        bs.cif.1.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.1) * bs.bh.k$haz *
+                               exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
+        bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
+                                                              cuminc=bs.cif.0.k)
+        bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
+                                                              cuminc=bs.cif.1.k)
+        bs.CIF$RD[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] -
+          bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
+        bs.CIF$RR[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] /
+          bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
+
+        # RMT
+        bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
+                                                               cuminc=bs.cif.0.k)
+        bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
+                                                               cuminc=bs.cif.1.k)
+        bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
+          bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
+      }
+
+
+
+parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+{
+  X <- df[[T]]
+  E <- df[[E]]
+  nobs <- length(X)
+  trt <- df[[A]]
+  time <- sort(unique(X[E!=cens]))
+  E.set <- sort(unique(E))
+  E.set <- E.set[E.set!=cens]
+
+  res <- list(time=time)
+  res <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = rep(1,nobs))
+ # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
+  if (bs)
+  {
+    bs_seeds <- seq(1,nbs.rep,1) + seed
+    # allocate memory for bs results:
+    ntime <- length(res$time)
+    bs.CumHaz <- bs.CIF <- bs.RMT <- list()
+    for (k in E.set)
+    {
+      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
+    }
+    # sequential bootstrap:
+    foreach(i = 1:nbs.rep) %dopar%
+    {
+      set.seed(bs_seeds[i])
+      bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
+      bs.w <- bs.w/mean(bs.w)
+      bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
+    }
+    # summarize bs replications and save the results in 'res' object:
+    # res is a list with 4 fields:
+    # 1.time - a vector of times for which everything is estimated
+    # 2.trt.0[[paste("Ev=", k, sep="")]]: CumHaz, CIF, RMT
+    # 3.trt.1[[paste("Ev=", k, sep="")]]: CumHaz, CIF, RMT
+    # 4. trt.eff[[paste("Ev=", k, sep="")]]: log.CumHazR, RD, RR, ATE.RMT
+
+    # aggregate all bootstrap replications
+    for (k in E.set){
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
+    bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']])[[1]]
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
+    }
+
+    alpha = 1-conf.level
+    for (k in E.set)
+    {
+      # A. Cumulative Hazards::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.CI.L"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.L"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <-
+        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <-
+        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
+
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <-
+        sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.bs.avg"]] <-
+        mean(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+
+      # B. CIFs :::::::::::::::::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.CI.L"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.CI.L"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.CI.U"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.CI.U"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.CI.L"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.CI.U"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.CI.L"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.CI.U"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.SE"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.SE"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.SE"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.SE"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.bs.avg"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.bs.avg"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.bs.avg"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.bs.avg"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      # C. RMTs ::::::::::::::::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.CI.L"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.CI.L"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.CI.U"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.CI.U"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.CI.L"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.CI.U"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.SE"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.SE"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.SE"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.bs.avg"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.bs.avg"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+    }
+  class(res) <- "cmprsk"
+  return(res)
+  }
+}
+
+parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+{
+  X <- df[[T]]
+  E <- df[[E]]
+  nobs <- length(X)
+  trt <- df[[A]]
+  time <- sort(unique(X[E!=cens]))
+  E.set <- sort(unique(E))
+  E.set <- E.set[E.set!=cens]
+
+  res <- list(time=time) # this is the only place where I'll keep the time
+  res <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w)
+
+  # calculate and save trt effect measures:
+  for (k in E.set)
+  {
+    # calculate log(CumHaz1/CumHaz0)
+    b <- log(est.1[[paste("Ev=", k, sep="")]]$CumHaz) -
+      log(est.0[[paste("Ev=", k, sep="")]]$CumHaz) # under PH, this is beta=log(HR_TRT)
+    # without PH, it is log(HR_1(t)/HR_0(t))
+
+    CIF.1 <- est.1[[paste("Ev=", k, sep="")]]$CIF
+    CIF.0 <- est.0[[paste("Ev=", k, sep="")]]$CIF
+    RMT.1 <- est.1[[paste("Ev=", k, sep="")]]$RMT
+    RMT.0 <- est.0[[paste("Ev=", k, sep="")]]$RMT
+
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=b,
+                                                   RD=CIF.1-CIF.0, RR=CIF.1/CIF.0,
+                                                   ATE.RMT=RMT.1-RMT.0)
+  } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
+
+  set.seed(seed)
+
+  if (bs)
+  {
+    bs_seeds <- seq(1,nbs.rep,1) + seed
+    # allocate memory for bs results:
+    ntime <- length(res$time)
+    bs.CumHaz <- bs.CIF <- bs.RMT <- list()
+    for (k in E.set)
+    {
+      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
+        bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <-
+        bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
+        bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
+    }
+    # sequential bootstrap:
+    foreach(i = 1:nbs.rep) %dopar%
+    {
+      set.seed(bs_seeds[i])
+      bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
+      bs.w <- bs.w/mean(bs.w)
+      bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
+    }
+
+    for (k in E.set){
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
+    bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
+    bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
+    bs.CumHaz$trt.eff[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
+    }
+
+
+    # summarize bs replications and save the results in 'res' object:
+    # res is a list with 4 fields:
+    # 1.time - a vector of times for which everything is estimated
+    # 2.trt.0[[paste("Ev=", k, sep="")]]: CumHaz, CIF, RMT
+    # 3.trt.1[[paste("Ev=", k, sep="")]]: CumHaz, CIF, RMT
+    # 4. trt.eff[[paste("Ev=", k, sep="")]]: log.CumHazR, RD, RR, ATE.RMT
+    alpha = 1-conf.level
+    for (k in E.set)
+    {
+      # A. Cumulative Hazards::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.CI.L"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.L"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <-
+        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <-
+        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <-
+        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
+        apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
+        apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.bs.avg"]] <-
+        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      # B. CIFs :::::::::::::::::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.CI.L"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.CI.L"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.CI.U"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.CI.U"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.CI.L"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.CI.U"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.CI.L"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.CI.U"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.SE"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.SE"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.SE"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.SE"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["CIF.bs.avg"]] <-
+        apply(bs.CIF$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["CIF.bs.avg"]] <-
+        apply(bs.CIF$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RD.bs.avg"]] <-
+        apply(bs.CIF$RD[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["RR.bs.avg"]] <-
+        apply(bs.CIF$RR[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      # C. RMTs ::::::::::::::::::::::::::::::::::::::::::::::
+      # CI:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.CI.L"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.CI.L"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.CI.U"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.CI.U"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.CI.L"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.CI.U"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      # SE:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.SE"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.SE"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.SE"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+      # bs.avg:
+      res$trt.0[[paste("Ev=", k, sep="")]][["RMT.bs.avg"]] <-
+        apply(bs.RMT$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.1[[paste("Ev=", k, sep="")]][["RMT.bs.avg"]] <-
+        apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
+        apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+    }
+  }
+  class(res) <- "cmprsk"
+  return(res)
+}
 
 
 
