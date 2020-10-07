@@ -816,11 +816,95 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   return(point.res)
 }
 
+.nonpar.run <- function(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w)
+{
+  if (wtype!="unadj")
+  {
+    ps.fit <- get.weights(df, A, C, wtype)
+    est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
+                              case.w =ps.fit$w[trt==0], cens=cens, time=time, E.set)
+    est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
+                              case.w=ps.fit$w[trt==1], cens=cens, time=time, E.set)
+  }
+  else
+  {
+    un.w <- rep(1, nobs)
+    est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
+                              case.w =un.w[trt==0], cens=cens, time=time, E.set)
+    est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
+                              case.w=un.w[trt==1], cens=cens, time=time, E.set)
+  }
+  res <- list(time=time)
+  res$trt.0 <- est.0 # save point estimates in the trt world 0
+  res$trt.1 <- est.1 # save point estimates in the trt world 1
+
+  # calculate and save trt effect measures:
+  for (k in E.set)
+  {
+    # calculate log(CumHaz1/CumHaz0)
+    b <- log(est.1[[paste("Ev=", k, sep="")]]$CumHaz) -
+      log(est.0[[paste("Ev=", k, sep="")]]$CumHaz) # under PH, this is beta=log(HR_TRT)
+    # without PH, it is log(HR_1(t)/HR_0(t))
+
+    CIF.1 <- est.1[[paste("Ev=", k, sep="")]]$CIF
+    CIF.0 <- est.0[[paste("Ev=", k, sep="")]]$CIF
+    RMT.1 <- est.1[[paste("Ev=", k, sep="")]]$RMT
+    RMT.0 <- est.0[[paste("Ev=", k, sep="")]]$RMT
+
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=b,
+                                                   RD=CIF.1-CIF.0, RR=CIF.1/CIF.0,
+                                                   ATE.RMT=RMT.1-RMT.0)
+  } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
+  res
+}
+
+.cox.run <- function(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w)
+{
+  if (wtype!="unadj")
+  {
+    ps.fit <- get.weights(df, A, C, wtype,case.w = case.w)
+    est <- .estimate.cox(X=X, E=E, trt=trt, case.w = case.w*ps.fit$w, cens=cens, time=time, E.set=E.set)
+  }
+  else
+    est <- .estimate.cox(X=X, E=E, trt=trt, case.w=case.w, cens=cens, time=time, E.set=E.set)
+
+  res <- list(time=time)
+  for (k in E.set)
+  {
+    # CumHaz:
+    time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
+    res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
+      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz)
+    res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
+      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
+
+    # CIF:
+    bh.k <- .base.haz.std(est[[paste("Ev=", k, sep="")]]$bh)
+    cif.0.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.0) * bh.k$haz)
+    cif.1.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.1) * bh.k$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
+    res$trt.0[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.0.k)
+    res$trt.1[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.1.k)
+    # RMT:
+    res$trt.0[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.0.k)
+    res$trt.1[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.1.k)
+
+    RD <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF - res$trt.0[[paste("Ev=", k, sep="")]]$CIF
+    RR <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF / res$trt.0[[paste("Ev=", k, sep="")]]$CIF
+    ATE.RMT <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT - res$trt.0[[paste("Ev=", k, sep="")]]$RMT
+
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=est[[paste("Ev=", k, sep="")]]$logHR,
+                                                   RD=RD, RR=RR,
+                                                   ATE.RMT=ATE.RMT)
+  } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
+  res
+}
 
 #===================  Colin's additions ======================================
 library(future)
 library(furrr)
 library(doParallel)
+library(data.table)
+library(purrr)
 # Parallel Cox Fit
 
 boot_comb <- function(x, ...) {
@@ -933,7 +1017,7 @@ parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
-#  res <- list(time=time)
+  #  res <- list(time=time)
   res <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X, case.w = rep(1,nobs))
   # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
@@ -951,8 +1035,7 @@ parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
     }
-    bs_aggregates <- list()
-    foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
+    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
                                      ".get.CIF",".get.S", ".get.RMT"),
             .packages=c("survival")) %dopar%
       {
@@ -976,7 +1059,7 @@ parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep
       bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
       bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
       bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
-      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']])))
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list((map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']])))))
       bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
       bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
       bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
@@ -1099,7 +1182,7 @@ parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
-#  res <- list(time=time) # this is the only place where I'll keep the time
+ #  res <- list(time=time) # this is the only place where I'll keep the time
   res <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X, case.w = rep(1,nobs))
 
  # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
@@ -1118,8 +1201,7 @@ parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
     }
-    bs_aggregates <- list()
-    foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
+    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
                                      ".get.CIF",".get.S", ".get.RMT"),
             .packages=c("survival")) %dopar%
       {
