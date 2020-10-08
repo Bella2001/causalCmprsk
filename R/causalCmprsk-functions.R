@@ -271,11 +271,12 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
                                                    ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-  set.seed(seed)
+#  set.seed(seed)
 
   if (bs)
   {
     # allocate memory for bs results:
+    bs_seeds <- (1:nbs.rep) + seed
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
     for (k in E.set)
@@ -290,6 +291,7 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
+      set.seed(bs_seeds[i])
       bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
       bs.w <- bs.w/mean(bs.w)
 
@@ -824,7 +826,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 # Parallel Cox Fit
 
 boot_comb <- function(x, ...) {
-  # takes each bootstrap iteration and combines it with some logic 
+  # takes each bootstrap iteration and combines it with some logic
 }
 
 get_os <- function(){

@@ -17,19 +17,20 @@
 {
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype)
+    ps.fit <- get.weights(df, A, C, wtype, case.w = case.w)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
-                              case.w =ps.fit$w[trt==0], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==0]*ps.fit$w[trt==0],
+                              cens=cens, time=time, E.set)
     est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
-                              case.w=ps.fit$w[trt==1], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==1]*ps.fit$w[trt==1],
+                              cens=cens, time=time, E.set)
   }
   else
   {
-    un.w <- rep(1, nobs)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
-                              case.w =un.w[trt==0], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==0], cens=cens, time=time, E.set)
     est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
-                              case.w=un.w[trt==1], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==1], cens=cens, time=time, E.set)
   }
   res <- list(time=time)
   res$trt.0 <- est.0 # save point estimates in the trt world 0

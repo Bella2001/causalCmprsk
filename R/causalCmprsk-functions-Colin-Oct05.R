@@ -103,20 +103,23 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
 #' Description ...
 #'
 #' @param df a data frame with ...
+#' @param C
+#' @param wtype "unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
+#' population and adjusted (weighted) population wit hweights provided in wtype.
 #'
 #' @examples
 #' # please see our package vignette for practical examples
 #'
 #' @export
-get.numAtRisk <- function(df, T, E, A, C, wtype="stab.ATE", cens=0)
+get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
 {
   X <- df[[T]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
-  ps.fit <- get.weights(df=df, A=A, C=C, wtype=wtype)
 
   res <- list()
+  ps.fit <- get.weights(df=df, A=A, C=C, wtype=wtype)
   fit.w.1 <- survfit(Surv(time = X[trt==1], ev = as.numeric(E[trt==1]!=0) )~1, weights=ps.fit$w[trt==1])
   fit.unw.1 <- survfit(Surv(time = X[trt==1], ev = as.numeric(E[trt==1]!=0) )~1)
   fit.w.0 <- survfit(Surv(time = X[trt==0], ev = as.numeric(E[trt==0]!=0) )~1, weights=ps.fit$w[trt==0])
@@ -205,6 +208,7 @@ get.numAtRisk <- function(df, T, E, A, C, wtype="stab.ATE", cens=0)
 #' is assumed a treatment group, and \code{A}=0 a control group.
 #' @param C a vector of character strings with variable names (potential confounders)
 #' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
 #' @param seed for the bootstrap
 #' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
 #' @param wtype a character variable indicating the type of weight.
@@ -220,7 +224,7 @@ get.numAtRisk <- function(df, T, E, A, C, wtype="stab.ATE", cens=0)
 #' # please see our package vignette for practical examples
 #'
 #' @export
-fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -269,10 +273,9 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
                                                    ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-  set.seed(seed)
-
   if (bs)
   {
+    bs_seeds <- (1:nbs.rep) + seed
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
@@ -288,6 +291,7 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
+      set.seed(bs_seeds[i])
       bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
       bs.w <- bs.w/mean(bs.w)
 
@@ -488,6 +492,7 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
 #' is assumed a treatment group, and \code{A}=0 a control group.
 #' @param C a vector of character strings with variable names (potential confounders)
 #' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
 #' @param seed for the bootstrap
 #' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
 #' @param wtype a character variable indicating the type of weight.
@@ -503,7 +508,7 @@ fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, 
 #' # please see our package vignette for practical examples
 #'
 #' @export
-fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -550,9 +555,10 @@ fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, see
                                                    ATE.RMT=ATE.RMT)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-  set.seed(seed)
+
   if (bs)
   {
+    bs_seeds <- (1:nbs.rep) + seed
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
@@ -568,6 +574,7 @@ fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, see
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
+      set.seed(bs_seeds[i])
       bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
       bs.w <- bs.w/mean(bs.w)
       if (wtype!="unadj")
@@ -756,63 +763,62 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   K <-  length(cmprsk.obj$trt.0) # number of events
   for (k in 1:K)
   {
-    point.res$trt.0[[k]] <- list()
-    point.res$trt.1[[k]] <- list()
-    point.res$trt.eff[[k]] <- list()
+    point.res$trt.0[[paste("Ev=", k, sep="")]] <- list()
+    point.res$trt.1[[paste("Ev=", k, sep="")]] <- list()
+    point.res$trt.eff[[paste("Ev=", k, sep="")]] <- list()
     #trt.0
-    point.res$trt.0[[k]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CumHaz)
-    point.res$trt.0[[k]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CumHaz.CI.L)
-    point.res$trt.0[[k]]$CumHaz.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CumHaz.CI.U)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CumHaz)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CumHaz.CI.L)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CumHaz.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CumHaz.CI.U)
 
-    point.res$trt.0[[k]]$CIF <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CIF)
-    point.res$trt.0[[k]]$CIF.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CIF.CI.L)
-    point.res$trt.0[[k]]$CIF.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$CIF.CI.U)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CIF <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CIF)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CIF.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CIF.CI.L)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$CIF.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$CIF.CI.U)
 
-    point.res$trt.0[[k]]$RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$RMT)
-    point.res$trt.0[[k]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$RMT.CI.L)
-    point.res$trt.0[[k]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[k]]$RMT.CI.U)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$RMT)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$RMT.CI.L)
+    point.res$trt.0[[paste("Ev=", k, sep="")]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.0[[paste("Ev=", k, sep="")]]$RMT.CI.U)
 
     # trt.1
-    point.res$trt.1[[k]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CumHaz)
-    point.res$trt.1[[k]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CumHaz.CI.L)
-    point.res$trt.1[[k]]$CumHaz.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CumHaz.CI.U)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CumHaz <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CumHaz)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CumHaz.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CumHaz.CI.L)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CumHaz.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CumHaz.CI.U)
 
-    point.res$trt.1[[k]]$CIF <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CIF)
-    point.res$trt.1[[k]]$CIF.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CIF.CI.L)
-    point.res$trt.1[[k]]$CIF.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$CIF.CI.U)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CIF <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CIF)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CIF.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CIF.CI.L)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$CIF.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$CIF.CI.U)
 
-    point.res$trt.1[[k]]$RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$RMT)
-    point.res$trt.1[[k]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$RMT.CI.L)
-    point.res$trt.1[[k]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[k]]$RMT.CI.U)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$RMT)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$RMT.CI.L)
+    point.res$trt.1[[paste("Ev=", k, sep="")]]$RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.1[[paste("Ev=", k, sep="")]]$RMT.CI.U)
 
     # trt.eff
-    if (length(point.res$trt.eff[[k]]$log.CumHazR)!=1)
+    if (length(cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR)!=1)
     {
-      point.res$trt.eff[[k]]$log.CumHazR <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$log.CumHazR)
-      point.res$trt.eff[[k]]$log.CumHazR.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$log.CumHazR.CI.L)
-      point.res$trt.eff[[k]]$log.CumHazR.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$log.CumHazR.CI.U)
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR)
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.L)
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.U)
     }
     else
     {
-      point.res$trt.eff[[k]]$CumHaz <- cmprsk.obj$trt.eff[[k]]$log.CumHazR
-      point.res$trt.eff[[k]]$CumHaz.CI.L <- cmprsk.obj$trt.eff[[k]]$log.CumHazR.CI.L
-      point.res$trt.eff[[k]]$CumHaz.CI.U <- cmprsk.obj$trt.eff[[k]]$log.CumHazR.CI.U
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$CumHaz <- cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$CumHaz.CI.L <- cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.L
+      point.res$trt.eff[[paste("Ev=", k, sep="")]]$CumHaz.CI.U <- cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$log.CumHazR.CI.U
     }
 
-    point.res$trt.eff[[k]]$RD <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD)
-    point.res$trt.eff[[k]]$RD.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD.CI.L)
-    point.res$trt.eff[[k]]$RD.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RD.CI.U)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RD <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RD)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RD.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RD.CI.L)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RD.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RD.CI.U)
 
-    point.res$trt.eff[[k]]$RR <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RR)
-    point.res$trt.eff[[k]]$RR.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RR.CI.L)
-    point.res$trt.eff[[k]]$RR.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$RR.CI.U)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RR <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RR)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RR.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RR.CI.L)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$RR.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$RR.CI.U)
 
-    point.res$trt.eff[[k]]$ATE.RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT)
-    point.res$trt.eff[[k]]$ATE.RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT.CI.L)
-    point.res$trt.eff[[k]]$ATE.RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[k]]$ATE.RMT.CI.U)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT.CI.L <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT.CI.L)
+    point.res$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT.CI.U <- .get.CIF(timepoint, cmprsk.obj$time, cmprsk.obj$trt.eff[[paste("Ev=", k, sep="")]]$ATE.RMT.CI.U)
 
   }
-
   return(point.res)
 }
 
@@ -820,19 +826,20 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 {
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype)
+    ps.fit <- get.weights(df, A, C, wtype, case.w = case.w)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
-                              case.w =ps.fit$w[trt==0], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==0]*ps.fit$w[trt==0],
+                              cens=cens, time=time, E.set)
     est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
-                              case.w=ps.fit$w[trt==1], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==1]*ps.fit$w[trt==1],
+                              cens=cens, time=time, E.set)
   }
   else
   {
-    un.w <- rep(1, nobs)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
-                              case.w =un.w[trt==0], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==0], cens=cens, time=time, E.set)
     est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
-                              case.w=un.w[trt==1], cens=cens, time=time, E.set)
+                              case.w = case.w[trt==1], cens=cens, time=time, E.set)
   }
   res <- list(time=time)
   res$trt.0 <- est.0 # save point estimates in the trt world 0
@@ -899,12 +906,13 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   res
 }
 
-#===================  Colin's additions ======================================
-library(future)
-library(furrr)
-library(doParallel)
-library(data.table)
-library(purrr)
+
+
+# library(future)
+# library(furrr)
+# library(doParallel)
+# library(data.table)
+# library(purrr)
 # Parallel Cox Fit
 
 boot_comb <- function(x, ...) {
@@ -928,86 +936,9 @@ if(grepl('unix|linux',get_os(),ignore.case = T)){
   registerDoParallel()
 }
 
-df <- data.frame(trt = rbinom(100,1,.5),X = rexp(100,1),E = {rbinom(100,1,.3) + 1},C = rbinom(100,1,.7))
-
-# Cox-based estimation:
-#res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="stab.ATE", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
-
-demo_parallel_boot <- function(i,df, T, E, A, C, wtype,E.set,cens,time) {
-  X <- df[[T]]
-  E <- df[[E]]
-  nobs <- length(X)
-  trt <- df[[A]]
-  bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
-  bs.w <- bs.w/mean(bs.w)
-  if (wtype!="unadj"){
-    bs.ps.fit <- get.weights(df,A,C,wtype, case.w = bs.w)
-    bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*bs.ps.fit$w, cens=cens, time=time, E.set=E.set)
-  }
-  else
-    bs.est <- .estimate.cox(X=X, E=E, trt=df$trt, case.w =bs.w, cens=cens, time=time, E.set=E.set)
-}
 
 
-my_vector <- foreach(i = 1:10) %dopar% demo_parallel_boot(i,df,'X','E','trt',c('C'),'stab.ATE',c(1,2),cens = 0,time = sort(df$X))
-
-# accumulate results
-
-### inside event 1, we have list of 2: logHR is scalar, bh is a dataframe with 2 cols, hazard and time
-### combine logHR into  a vector
-### combine bh, ignore time, combine hazards row for every iteration (rbind)
-
-# allocate memory for bs results:
-ntime <- length(res$time)
-bs.CumHaz <- bs.CIF <- bs.RMT <- list()
-for (k in E.set)
-{
-  bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <-
-    bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <-
-    bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
-    bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
-    bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
-  bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
-}
-
-for (k in E.set)
-{
-  # CumHaz:
-  bs.time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
-  bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]][i,] <-
-    sapply(time, .get.CIF, bs.time.k,
-           bs.est[[paste("Ev=", k, sep="")]]$bh$haz)
-  bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]][i,] <-
-    sapply(time, .get.CIF, bs.time.k,
-           bs.est[[paste("Ev=", k, sep="")]]$bh$haz * exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
-  bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]][i] <- bs.est[[paste("Ev=", k, sep="")]]$logHR
-
-  # CIF
-  bs.bh.k <- .base.haz.std(bs.est[[paste("Ev=", k, sep="")]]$bh)
-  bs.cif.0.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.0) * bs.bh.k$haz)
-  bs.cif.1.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.1) * bs.bh.k$haz *
-                         exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
-  bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
-                                                        cuminc=bs.cif.0.k)
-  bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
-                                                        cuminc=bs.cif.1.k)
-  bs.CIF$RD[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] -
-    bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
-  bs.CIF$RR[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] /
-    bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
-
-  # RMT
-  bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
-                                                        cuminc=bs.cif.0.k)
-  bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
-                                                        cuminc=bs.cif.1.k)
-  bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
-    bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
-}
-
-
-
-parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+parallel.fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -1035,7 +966,7 @@ parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
     }
-    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
+    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox", ".base.haz.std",
                                      ".get.CIF",".get.S", ".get.RMT"),
             .packages=c("survival")) %dopar%
       {
@@ -1172,7 +1103,7 @@ parallel.fit.cox <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep
   }
 }
 
-parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
+parallel.fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", bs=FALSE, nbs.rep=400, seed=17, cens=0, conf.level=0.95)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -1188,7 +1119,7 @@ parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.
  # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
   {
-    bs_seeds <- seq(1,nbs.rep,1) + seed
+    bs_seeds <- (1:nbs.rep) + seed
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
@@ -1216,8 +1147,8 @@ parallel.fit.nonpar <- function(df, T, E, A, C, wtype="stab.ATE", bs=FALSE, nbs.
       bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
       bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
       bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
-      bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
-      bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
+      bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
+      bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']]))))
       bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
       bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))

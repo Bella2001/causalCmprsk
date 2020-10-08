@@ -165,76 +165,122 @@ covs.names <- c("age", "sex_Male", "edu", "race_black", "race_other",
                 "alb1", "bili1", "crea1", "hema1", "paco21", "pafi1",
                 "ph1", "pot1", "sod1", "wblc1")
 
+
 # Nonparametric estimation:
 res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=10, seed=17, cens=0, conf.level=0.95)
 par.res.overlap <- parallel.fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=10, seed=17, cens=0, conf.level=0.95)
 
+res30 <- get.pointEst(res.overlap,timepoint = 30)
+par.res30 <- get.pointEst(par.res.overlap,timepoint = 30)
+res30$trt.eff
+par.res30$trt.eff
+
 # Cox-based estimation:
 res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=10, seed=17, cens=0, conf.level=0.95)
 par.res.cox.overlap <- parallel.fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=10, seed=17, cens=0, conf.level=0.95)
+res30 <- get.pointEst(res.cox.overlap,timepoint = 30)
 
+
+library(rbenchmark)
+# nonparametric:==============================
+benchmark("sequential.nonpar" = {
+  fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names,
+             wtype="overlap", bs=TRUE, nbs.rep=10, seed=17,
+             cens=0, conf.level=0.95)
+},
+"parallel.nonpar" = {
+  parallel.fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names,
+                      wtype="overlap", bs=TRUE, nbs.rep=10, seed=17,
+                      cens=0, conf.level=0.95)
+},
+replications = 10,
+columns = c("test", "replications", "elapsed",
+            "relative", "user.self", "sys.self"))
+
+# Cox: =======================================
+benchmark("sequential.cox" = {
+  fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names,
+          wtype="overlap", bs=TRUE, nbs.rep=10, seed=17,
+          cens=0, conf.level=0.95)
+},
+"parallel.cox" = {
+  parallel.fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names,
+                   wtype="overlap", bs=TRUE, nbs.rep=10, seed=17,
+                   cens=0, conf.level=0.95)
+},
+replications = 10,
+columns = c("test", "replications", "elapsed",
+            "relative", "user.self", "sys.self"))
+
+# test replications elapsed relative user.self sys.self
+# 2   parallel.nonpar           10   54.75    1.000     20.36     1.25
+# 1 sequential.nonpar           10   86.39    1.578     69.04     3.22
+#
+# test replications elapsed relative user.self sys.self
+# 2   parallel.cox           10   57.26    1.000     19.40     1.19
+# 1 sequential.cox           10   79.92    1.396     67.83     2.34
 
 # # ------------- check point estimates in sequential and parallel versions of code -------------
-# get.CumHaz <- function(res1, res2, Ev)
-# {
-#   df <- rbind( data.frame(time=res1$time, population=1, TRT=1,
-#                           CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                           CIL.CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                           CIU.CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
-#                data.frame(time=res2$time, population=2, TRT=1,
-#                           CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                           CIL.CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                           CIU.CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
-#                # data.frame(time=res3$time, population=3, TRT=1,
-#                #            CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                #            CIL.CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                #            CIU.CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
-#                data.frame(time=res1$time, population=1, TRT=0,
-#                           CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                           CIL.CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                           CIU.CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
-#                data.frame(time=res2$time, population=2, TRT=0,
-#                           CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                           CIL.CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                           CIU.CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U)
-#                # data.frame(time=res3$time, population=3, TRT=0,
-#                #            CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
-#                #            CIL.CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
-#                #            CIU.CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U)
-#   )
-#   df$population <- factor(df$population)
-#   levels(df$population) <- c("sequential", "parallel")
-#   df
-# }
-#
-# df.CumHaz <- list()
-# E.set <- sort(unique(rhc$E))
-# E.set <- E.set[E.set!=0] # 0 is for censoring status
-# for (k in E.set)
-#   df.CumHaz[[k]] <- get.CumHaz(res.overlap, par.res.overlap, k)
-#
-#
-# plot.CumHaz <- function(df, title, ymax)
-# {
-#   p <- ggplot(df, aes(x=time, y=CumHaz, color=population, fill=population, shape=population)) + ggtitle(title) +
-#     geom_step(size=1.1) +
-#     #     geom_ribbon(aes(ymin=CIL.CumHaz, ymax=CIU.CumHaz), alpha=0.2, stat="stepribbon") +
-#     scale_fill_npg() + scale_color_npg()
-#   p <- p + xlab("time from admission to ICU (days)") + ylab("Cumulative Hazard (t)") + ylim(0, ymax)+
-#     theme(axis.text.x = element_text(face="bold", angle=45),
-#           axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-#     theme(legend.position = c(0.7, 0.3),
-#           legend.background=element_rect(fill="transparent"),
-#           panel.grid.minor = element_line(size = .5,colour = "gray92"),
-#           panel.grid.major = element_line(size = .5,colour = "#C0C0C0")) +
-#     geom_vline(xintercept=30, linetype="dashed")
-#   p
-# }
-#
-# plot.CumHaz(df=df.CumHaz[[1]][df.CumHaz[[1]]$TRT==1,], title="RHC: CumHaz of Discharge", ymax=6)
-# plot.CumHaz(df=df.CumHaz[[1]][df.CumHaz[[1]]$TRT==0,], title="No-RHC: CumHaz of Discharge", ymax=6)
-# plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==1,], title="RHC: CumHaz of Death", ymax=2.5)
-# plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==0,], title="No-RHC: CumHaz of Death", ymax=2.5)
+get.CumHaz <- function(res1, res2, Ev)
+{
+  df <- rbind( data.frame(time=res1$time, population=1, TRT=1,
+                          CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
+                          CIL.CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+                          CIU.CumHaz=res1$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
+               data.frame(time=res2$time, population=2, TRT=1,
+                          CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
+                          CIL.CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+                          CIU.CumHaz=res2$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
+               # data.frame(time=res3$time, population=3, TRT=1,
+               #            CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz,
+               #            CIL.CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+               #            CIU.CumHaz=res3$trt.1[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
+               data.frame(time=res1$time, population=1, TRT=0,
+                          CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
+                          CIL.CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+                          CIU.CumHaz=res1$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U),
+               data.frame(time=res2$time, population=2, TRT=0,
+                          CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
+                          CIL.CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+                          CIU.CumHaz=res2$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U)
+               # data.frame(time=res3$time, population=3, TRT=0,
+               #            CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz,
+               #            CIL.CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.L,
+               #            CIU.CumHaz=res3$trt.0[[paste("Ev=", Ev, sep="")]]$CumHaz.CI.U)
+  )
+  df$population <- factor(df$population)
+  levels(df$population) <- c("sequential", "parallel")
+  df
+}
+
+df.CumHaz <- list()
+E.set <- sort(unique(rhc$E))
+E.set <- E.set[E.set!=0] # 0 is for censoring status
+for (k in E.set)
+  df.CumHaz[[k]] <- get.CumHaz(res.overlap, par.res.overlap, k)
+
+
+plot.CumHaz <- function(df, title, ymax)
+{
+  p <- ggplot(df, aes(x=time, y=CumHaz, color=population, fill=population, shape=population)) + ggtitle(title) +
+    geom_step(size=1.1) +
+         geom_ribbon(aes(ymin=CIL.CumHaz, ymax=CIU.CumHaz), alpha=0.2, stat="stepribbon") +
+    scale_fill_npg() + scale_color_npg()
+  p <- p + xlab("time from admission to ICU (days)") + ylab("Cumulative Hazard (t)") + ylim(0, ymax)+
+    theme(axis.text.x = element_text(face="bold", angle=45),
+          axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
+    theme(legend.position = c(0.7, 0.3),
+          legend.background=element_rect(fill="transparent"),
+          panel.grid.minor = element_line(size = .5,colour = "gray92"),
+          panel.grid.major = element_line(size = .5,colour = "#C0C0C0")) +
+    geom_vline(xintercept=30, linetype="dashed")
+  p
+}
+
+plot.CumHaz(df=df.CumHaz[[1]][df.CumHaz[[1]]$TRT==1,], title="RHC: CumHaz of Discharge", ymax=6)
+plot.CumHaz(df=df.CumHaz[[1]][df.CumHaz[[1]]$TRT==0,], title="No-RHC: CumHaz of Discharge", ymax=6)
+plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==1,], title="RHC: CumHaz of Death", ymax=2.5)
+plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==0,], title="No-RHC: CumHaz of Death", ymax=2.5)
 
 
 
@@ -243,7 +289,7 @@ par.res.cox.overlap <- parallel.fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.na
 
 # init inputs
 df=rhc
-T="T" 
+T="T"
 E="E"
 A="RHC"
 C=covs.names
@@ -286,7 +332,7 @@ bs_seeds <- seq(1,nbs.rep,1) + seed
       bs.w <- bs.w/mean(bs.w)
       bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
     }
-  
+
   for (k in E.set){
     bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
     bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
