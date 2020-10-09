@@ -29,7 +29,8 @@ Imports:
     magrittr,
     summarytools,
     kableExtra,
-    doParallel
+    doParallel,
+    parallel
 RoxygenNote: 7.1.1
 Suggests: 
     knitr,
