@@ -1253,7 +1253,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
-      num_cores <- round(detectCores()/2,digits = 0)
+      num_cores <- round(parallel::detectCores()/2,digits = 0)
       cluster <- makeCluster(num_cores)
       registerDoParallel(cl = cluster)
     }
@@ -1280,7 +1280,7 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
 
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
-      num_cores <- round(detectCores()/2,digits = 0)
+      num_cores <- round(parallel::detectCores()/2,digits = 0)
       cluster <- makeCluster(num_cores)
       registerDoParallel(cl = cluster)
     }

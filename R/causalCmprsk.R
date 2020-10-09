@@ -37,6 +37,7 @@
 #' @import parallel
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
+#' @importFrom parallel detectCores
 #' @useDynLib causalCmprsk, .registration = TRUE
 #'
 #' @docType package
