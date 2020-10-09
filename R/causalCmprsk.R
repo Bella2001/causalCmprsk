@@ -34,9 +34,9 @@
 #' @import future
 #' @import furrr
 #' @import doParallel
+#' @import parallel
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
-#' @importFrom doParallel detectCores
 #' @useDynLib causalCmprsk, .registration = TRUE
 #'
 #' @docType package
