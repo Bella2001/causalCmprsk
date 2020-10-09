@@ -1270,7 +1270,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 
 }
 
-fit.nonpr <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
+fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
 
   get_os <- function(){
     platform <- .Platform$OS.type

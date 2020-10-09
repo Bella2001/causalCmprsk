@@ -18,8 +18,7 @@ library(magrittr)
 library(summarytools) # for summary distributions of covariates - check if I use it!!!
 library(DT) # check if I use it!!!!
 library(Hmisc)
-
-library(causalCmprsk)
+#library(causalCmprsk)
 
 column_types_rhc <-
   cols(urin1 = "d", meanbp1 = "d", resp1 = "d",
