@@ -336,6 +336,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT -
           bs.est.0[[paste("Ev=", k, sep="")]]$RMT
       }
+      if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
     }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -620,6 +621,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
           bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
       }
+      if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
     }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -945,6 +947,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
+        if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
       }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -1111,6 +1114,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
+        if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
 
     for (k in E.set){
