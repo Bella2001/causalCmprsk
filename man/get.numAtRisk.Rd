@@ -4,10 +4,13 @@
 \alias{get.numAtRisk}
 \title{Obtaining number-at-risk statistic in the raw and weighted data}
 \usage{
-get.numAtRisk(df, T, E, A, C, wtype = "stab.ATE", cens = 0)
+get.numAtRisk(df, T, E, A, C = NULL, wtype = "stab.ATE", cens = 0)
 }
 \arguments{
 \item{df}{a data frame with ...}
+
+\item{wtype}{"unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
+population and adjusted (weighted) population wit hweights provided in wtype.}
 }
 \description{
 Description ...
