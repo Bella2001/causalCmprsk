@@ -306,7 +306,8 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT -
           bs.est.0[[paste("Ev=", k, sep="")]]$RMT
       }
-      if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
+      if(i %% 25 == 0)
+        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
     }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -561,7 +562,8 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
           bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
       }
-      if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
+      if (i %% 25 == 0)
+        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
     }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -887,7 +889,8 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
+        if(i %% 25 == 0)
+          cat("We are on replication ",i," of ",nbs.rep," replications.\n")
       }
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -1054,7 +1057,8 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        if(i %% 25 == 0){print(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'))}
+        if(i %% 25 == 0)
+          cat("We are on replication ",i," of ",nbs.rep," replications.\n")
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
 
     for (k in E.set){
@@ -1224,12 +1228,12 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
     if(grepl('win',get_os(),ignore.case = T)) {
       num_cores <- round(parallel::detectCores()/2,digits = 0)
       cluster <- parallel::makeCluster(num_cores)
-      registerDoParallel(cl = cluster)
+      doParallel::registerDoParallel(cl = cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = T)){
-      registerDoParallel()
+      doParallel::registerDoParallel()
     }
 
     .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
@@ -1281,12 +1285,12 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
     if(grepl('win',get_os(),ignore.case = T)) {
       num_cores <- round(parallel::detectCores()/2,digits = 0)
       cluster <- parallel::makeCluster(num_cores)
-      registerDoParallel(cl = cluster)
+      doParallel::registerDoParallel(cl = cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = T)){
-      registerDoParallel()
+      doParallel::registerDoParallel()
     }
 
     .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
