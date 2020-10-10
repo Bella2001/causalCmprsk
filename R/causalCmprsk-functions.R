@@ -194,36 +194,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
 # in data from an RCT where there is no need for emulation of baseline randomization.
 
 
-#' Nonparametric estimation of ATE corresponding to the target population
-#'
-#'
-#' Description ...
-#'
-#'
-#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
-#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
-#' @param E a character string specifying the name of the "event type" variable in \code{df}.
-#' @param A a character specifying the name of the treatment/exposure variable.
-#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
-#' is assumed a treatment group, and \code{A}=0 a control group.
-#' @param C a vector of character strings with variable names (potential confounders)
-#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
-#' @param seed for the bootstrap
-#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
-#' @param wtype a character variable indicating the type of weight.
-#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
-#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from an RCT where there is no need for emulation of baseline randomization.
-#'
-#' @return  A list with components:
-#'
-#' @examples
-#' # please see our package vignette for practical examples
-#'
-#' @export
 .sequential.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
 {
   X <- df[[T]]
@@ -479,36 +449,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
 # cens - censoring value
 
 
-#' Cox-based estimation of ATE corresponding to the target population
-#'
-#'
-#' Description ...
-#'
-#'
-#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
-#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
-#' @param E a character string specifying the name of the "event type" variable in \code{df}.
-#' @param A a character specifying the name of the treatment/exposure variable.
-#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
-#' is assumed a treatment group, and \code{A}=0 a control group.
-#' @param C a vector of character strings with variable names (potential confounders)
-#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
-#' @param seed for the bootstrap
-#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
-#' @param wtype a character variable indicating the type of weight.
-#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
-#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from an RCT where there is no need for emulation of baseline randomization.
-#'
-#' @return  A list with components:
-#'
-#' @examples
-#' # please see our package vignette for practical examples
-#'
-#' @export
 .sequential.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
 {
   X <- df[[T]]
@@ -1242,7 +1182,36 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   return(res)
 }
 
-
+#' Cox-based estimation of ATE corresponding to the target population
+#'
+#'
+#' Description ...
+#'
+#'
+#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
+#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param E a character string specifying the name of the "event type" variable in \code{df}.
+#' @param A a character specifying the name of the treatment/exposure variable.
+#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+#' is assumed a treatment group, and \code{A}=0 a control group.
+#' @param C a vector of character strings with variable names (potential confounders)
+#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
+#' @param seed for the bootstrap
+#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
+#' @param wtype a character variable indicating the type of weight.
+#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
+#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+#' in data from an RCT where there is no need for emulation of baseline randomization.
+#'
+#' @return  A list with components:
+#'
+#' @examples
+#' # please see our package vignette for practical examples
+#'
+#' @export
 fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
 
   get_os <- function(){
@@ -1254,7 +1223,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
       num_cores <- round(parallel::detectCores()/2,digits = 0)
-      cluster <- makeCluster(num_cores)
+      cluster <- parallel::makeCluster(num_cores)
       registerDoParallel(cl = cluster)
     }
 
@@ -1270,6 +1239,36 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 
 }
 
+#' Nonparametric estimation of ATE corresponding to the target population
+#'
+#'
+#' Description ...
+#'
+#'
+#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
+#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param E a character string specifying the name of the "event type" variable in \code{df}.
+#' @param A a character specifying the name of the treatment/exposure variable.
+#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+#' is assumed a treatment group, and \code{A}=0 a control group.
+#' @param C a vector of character strings with variable names (potential confounders)
+#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
+#' @param seed for the bootstrap
+#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
+#' @param wtype a character variable indicating the type of weight.
+#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
+#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+#' in data from an RCT where there is no need for emulation of baseline randomization.
+#'
+#' @return  A list with components:
+#'
+#' @examples
+#' # please see our package vignette for practical examples
+#'
+#' @export
 fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
 
   get_os <- function(){
@@ -1281,7 +1280,7 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
       num_cores <- round(parallel::detectCores()/2,digits = 0)
-      cluster <- makeCluster(num_cores)
+      cluster <- parallel::makeCluster(num_cores)
       registerDoParallel(cl = cluster)
     }
 
