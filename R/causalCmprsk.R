@@ -35,6 +35,7 @@
 #' @import furrr
 #' @import doParallel
 #' @import parallel
+#' @import utils
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
 #' @importFrom parallel detectCores
