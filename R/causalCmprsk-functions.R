@@ -243,6 +243,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
                                                    ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
+
   if (bs)
   {
     bs_seeds <- (1:nbs.rep) + seed
@@ -258,6 +259,8 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
     }
+
+    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
@@ -306,9 +309,12 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT -
           bs.est.0[[paste("Ev=", k, sep="")]]$RMT
       }
-      if(i %% 25 == 0)
-        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+      #      if(i %% 25 == 0)
+      #        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+      setTxtProgressBar(pb, i)
     }
+    close(pb)
+
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
     # 1.time - a vector of times for which everything is estimated
@@ -513,6 +519,8 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
     }
+
+    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
@@ -562,9 +570,12 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
           bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
       }
-      if (i %% 25 == 0)
-        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+      #     if (i %% 25 == 0)
+      #       cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+      setTxtProgressBar(pb, i)
     }
+    close(pb)
+
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
     # 1.time - a vector of times for which everything is estimated
@@ -881,17 +892,22 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
     }
+
+    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox", ".base.haz.std",
-                                     ".get.CIF",".get.S", ".get.RMT"),
-            .packages=c("survival")) %dopar%
+                                                      ".get.CIF",".get.S", ".get.RMT"),
+                             .packages=c("survival")) %dopar%
       {
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        if(i %% 25 == 0)
-          cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+        #        if(i %% 25 == 0)
+        #         cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
+        setTxtProgressBar(pb, i)
+        bs_aggregates
       }
+    close(pb)
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
     # 1.time - a vector of times for which everything is estimated
@@ -1030,10 +1046,10 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
- #  res <- list(time=time) # this is the only place where I'll keep the time
+  #  res <- list(time=time) # this is the only place where I'll keep the time
   res <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X, case.w = rep(1,nobs))
 
- # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
+  # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
   {
     bs_seeds <- (1:nbs.rep) + seed
@@ -1049,17 +1065,22 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
     }
+    # Create the progress bar.
+    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3, file=stdout())
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
-                                     ".get.CIF",".get.S", ".get.RMT"),
-            .packages=c("survival")) %dopar%
+                                                      ".get.CIF",".get.S", ".get.RMT"),
+                             .packages=c("survival")) %dopar%
       {
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        if(i %% 25 == 0)
-          cat("We are on replication ",i," of ",nbs.rep," replications.\n")
+        setTxtProgressBar(pb, i)
+        bs_aggregates
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
+    #        if(i %% 25 == 0)
+    #          cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
+    close(pb)
 
     for (k in E.set){
       bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
@@ -1239,7 +1260,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
     .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
   }
   else
-  .sequential.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .sequential.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
 
 }
 
@@ -1296,7 +1317,7 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
     .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
   }
   else
-  .sequential.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .sequential.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
 
 }
 
