@@ -243,10 +243,10 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
                                                    ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-
   if (bs)
   {
     bs_seeds <- (1:nbs.rep) + seed
+
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()
@@ -503,10 +503,10 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
                                                    ATE.RMT=ATE.RMT)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
-
   if (bs)
   {
     bs_seeds <- (1:nbs.rep) + seed
+
     # allocate memory for bs results:
     ntime <- length(res$time)
     bs.CumHaz <- bs.CIF <- bs.RMT <- list()

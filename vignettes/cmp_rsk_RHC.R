@@ -527,8 +527,8 @@ p
 ## ----label=RMT4, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5, message=FALSE, warning=FALSE, fig.cap="Restricted-mean-time-lost/gained due to specific event.", fig.show='hold'----
 p <- ggplot(df.CIF.RMT, aes(x=time, y=RMT, color=Event_TRT, 
                             fill=Event_TRT, shape=Event_TRT)) +
-  geom_step(size=1.1) + #ggtitle("Restricted-mean-time-lost/gained due to specific event") +  
-  geom_ribbon(aes(ymin=CIL.RMT, ymax=CIU.RMT), alpha=0.2, stat="stepribbon") +
+  geom_line(size=1.1) + #ggtitle("Restricted-mean-time-lost/gained due to specific event") +  
+  geom_ribbon(aes(ymin=CIL.RMT, ymax=CIU.RMT), alpha=0.2) + #, stat="stepribbon") +
   scale_fill_npg() + scale_color_npg()
  p <- p +  geom_vline(xintercept=30, linetype="dashed")+
   xlab("time from admission to ICU (days)") + ylab("average time lost due to death (gained by recovery)") + 
@@ -584,8 +584,8 @@ p
 ## ----echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Difference in average time lost/gained due to treatment.", fig.show='hold'----
 p <- ggplot(df.RD.RMT, aes(x=time, y=ATE.RMT, color=Outcome, 
                             fill=Outcome, shape=Outcome)) +
-  geom_step(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
-    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2, stat="stepribbon") +
+  geom_line(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
+    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) + #, stat="stepribbon") +
   scale_fill_npg() + scale_color_npg()
 p <- p +  geom_vline(xintercept=30, linetype="dashed")+
   xlab("time from admission to ICU (days)") + 
@@ -673,6 +673,7 @@ p <- p +
         panel.grid.major = element_line(size = .5,colour = "#C0C0C0")) 
 p
 
+# getting an estimate at a time point = 30 days: 
 est30 <- get.pointEst(res.acm.30, 30) 
 #cat("HR=", round(exp(est30$trt.eff[[1]]$log.CumHazR), dig=2),
 #    ", 95% CI=[", round(exp(est30$trt.eff[[1]]$log.CumHazR.CI.L), dig=2), ",", 
@@ -715,8 +716,8 @@ p
 
 ## ---- label=figRMT30, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Difference in average time lost due to RHC in the 30-day mortality.", fig.show='hold'----
 p <- ggplot(df.acm.RD.RMT, aes(x=time, y=ATE.RMT)) +
-  geom_step(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
-    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2, stat="stepribbon") +
+  geom_line(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
+    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) + #, stat="stepribbon") +
   scale_fill_npg() + scale_color_npg()
 p <- p +  #geom_vline(xintercept=30, linetype="dashed")+
   xlab("time from admission to ICU (days)") + 
