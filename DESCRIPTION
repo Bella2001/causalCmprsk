@@ -28,14 +28,20 @@ Imports:
     hrbrthemes,
     magrittr,
     summarytools,
-    kableExtra
+    kableExtra,
+    doParallel,
+    parallel,
+    utils
 RoxygenNote: 7.1.1
 Suggests: 
     knitr,
     rmarkdown,
-    prettydoc,
     bookdown
 VignetteBuilder: knitr
 URL: https://github.com/Bella2001/causalCmprsk
 BugReports: https://github.com/Bella2001/causalCmprsk/issues
+Collate:
+    causalCmprsk.R
+    causalCmprsk-functions.R
+
 

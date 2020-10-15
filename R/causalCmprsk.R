@@ -31,9 +31,14 @@
 #' @import hrbrthemes
 #' @import magrittr
 #' @import summarytools
-#'
+#' @import future
+#' @import furrr
+#' @import doParallel
+#' @import parallel
+#' @import utils
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
+#' @importFrom parallel detectCores
 #' @useDynLib causalCmprsk, .registration = TRUE
 #'
 #' @docType package

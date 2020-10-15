@@ -9,13 +9,14 @@ fit.cox(
   T,
   E,
   A,
-  C,
-  wtype = "stab.ATE",
+  C = NULL,
+  wtype = "unadj",
+  cens = 0,
+  conf.level = 0.95,
   bs = FALSE,
   nbs.rep = 400,
   seed = 17,
-  cens = 0,
-  conf.level = 0.95
+  parallel = TRUE
 )
 }
 \arguments{
@@ -29,8 +30,7 @@ fit.cox(
 It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
 is assumed a treatment group, and \code{A}=0 a control group.}
 
-\item{C}{a vector of character strings with variable names (potential confounders)
-in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).}
+\item{C}{the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data}
 
 \item{wtype}{a character variable indicating the type of weight.
 The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
@@ -39,9 +39,9 @@ There is also an option of "unajusted" estimation, by settinh wtype="unadj" - th
 treatment selection bias and will not use propensity scores weighting. It can be used, for example,
 in data from an RCT where there is no need for emulation of baseline randomization.}
 
-\item{seed}{for the bootstrap}
-
 \item{cens}{integer value in \code{E} that corresponds to censorings resorded in \code{T}.}
+
+\item{seed}{for the bootstrap}
 }
 \value{
 A list with components:
