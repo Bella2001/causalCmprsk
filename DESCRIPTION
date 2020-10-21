@@ -31,7 +31,9 @@ Imports:
     kableExtra,
     doParallel,
     parallel,
-    utils
+    utils,
+    foreach,
+    furrr
 RoxygenNote: 7.1.1
 Suggests: 
     knitr,
@@ -40,8 +42,3 @@ Suggests:
 VignetteBuilder: knitr
 URL: https://github.com/Bella2001/causalCmprsk
 BugReports: https://github.com/Bella2001/causalCmprsk/issues
-Collate:
-    causalCmprsk.R
-    causalCmprsk-functions.R
-
-

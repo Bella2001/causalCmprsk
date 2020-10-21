@@ -103,12 +103,10 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
 #' Description ...
 #'
 #' @param df a data frame with ...
-#' @param C
+#' @param C vcbv
 #' @param wtype "unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
 #' population and adjusted (weighted) population wit hweights provided in wtype.
 #'
-#' @examples
-#' # please see our package vignette for practical examples
 #'
 #' @export
 get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
@@ -695,10 +693,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
 #' @param cmprsk.obj a "cmprsk" object returned by one of the function \code{fit.cox} or \code{fit.nonpar}
 #' @param timepoint a scalar value of the time point of interest
 #'
-#' @return  A list with components: ...
-#'
-#' @examples
-#' # please see our package vignette for practical examples
 #'
 #' @export
 get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
@@ -1231,10 +1225,6 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
 #' in data from an RCT where there is no need for emulation of baseline randomization.
 #'
-#' @return  A list with components:
-#'
-#' @examples
-#' # please see our package vignette for practical examples
 #'
 #' @export
 fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
@@ -1288,10 +1278,6 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
 #' in data from an RCT where there is no need for emulation of baseline randomization.
 #'
-#' @return  A list with components:
-#'
-#' @examples
-#' # please see our package vignette for practical examples
 #'
 #' @export
 fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){

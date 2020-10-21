@@ -31,15 +31,15 @@
 #' @import hrbrthemes
 #' @import magrittr
 #' @import summarytools
-#' @import future
 #' @import furrr
 #' @import doParallel
 #' @import parallel
-#' @import utils
+#' @import foreach
 #'
 #' @importFrom stats pnorm qnorm quantile sd var
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #' @importFrom parallel detectCores
-#' @useDynLib causalCmprsk, .registration = TRUE
+#' @importFrom foreach foreach "%dopar%"
 #'
 #' @docType package
 #' @name causalCmprsk

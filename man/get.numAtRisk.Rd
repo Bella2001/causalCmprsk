@@ -9,13 +9,11 @@ get.numAtRisk(df, T, E, A, C = NULL, wtype = "stab.ATE", cens = 0)
 \arguments{
 \item{df}{a data frame with ...}
 
+\item{C}{vcbv}
+
 \item{wtype}{"unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
 population and adjusted (weighted) population wit hweights provided in wtype.}
 }
 \description{
 Description ...
-}
-\examples{
-# please see our package vignette for practical examples
-
 }

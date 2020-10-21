@@ -11,13 +11,6 @@ get.pointEst(cmprsk.obj, timepoint)
 
 \item{timepoint}{a scalar value of the time point of interest}
 }
-\value{
-A list with components: ...
-}
 \description{
 Returns point estimates corresponding to a time point
-}
-\examples{
-# please see our package vignette for practical examples
-
 }

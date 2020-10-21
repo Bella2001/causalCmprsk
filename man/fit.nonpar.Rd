@@ -43,13 +43,6 @@ in data from an RCT where there is no need for emulation of baseline randomizati
 
 \item{seed}{for the bootstrap}
 }
-\value{
-A list with components:
-}
 \description{
 Description ...
-}
-\examples{
-# please see our package vignette for practical examples
-
 }

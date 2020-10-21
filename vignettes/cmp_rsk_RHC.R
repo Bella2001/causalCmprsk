@@ -303,19 +303,25 @@ ggplot(rhc.ps, aes(x = overlap.w, fill = trt, color=trt)) +
 ## -----------------------------------------------------------------------------
 # overlap weights========================:
 # Nonparametric estimation:
-res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = TRUE)
 # Cox-based estimation:
-res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 # stab.ATE weights==========================:
 # Nonparametric estimation:
-res.stab.ATE <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="stab.ATE", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.stab.ATE <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 # Cox-based estimation:
-res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="stab.ATE", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 # unadjusted analysis========================:
 # Nonparametric estimation:
-res.un <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="unadj", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.un <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 # Cox-based estimation:
-res.cox.un <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, wtype="unadj", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.cox.un <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 
 ## ----echo=TRUE, message=FALSE, warning=FALSE----------------------------------
 get.logCumHR <- function(res, res.cox)
@@ -631,9 +637,9 @@ p <- ggplot(df.cumPr, aes(x=time, y=CumPr, color=TRT, fill=TRT, shape=TRT)) +
 ## -----------------------------------------------------------------------------
 # nonparametric:
 # acm=all-cause mortality
-res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 # Cox-based estimation:
-res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", bs=TRUE, nbs.rep=200, seed=17, cens=0, conf.level=0.95)
+res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
 
 ## ----echo=TRUE, fig.align="center",  fig.width=5, fig.height=5, message=FALSE, warning=FALSE, fig.cap="log-ratio of cumulative hazards for 30-day mortality, using overlap weighting."----
 df1.acm.30 <- rbind( data.frame(time=res.acm.30$time, 
