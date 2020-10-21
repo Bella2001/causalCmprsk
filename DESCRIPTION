@@ -32,8 +32,7 @@ Imports:
     doParallel,
     parallel,
     utils,
-    foreach,
-    furrr
+    foreach
 RoxygenNote: 7.1.1
 Suggests: 
     knitr,

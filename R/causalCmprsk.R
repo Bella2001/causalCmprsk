@@ -31,7 +31,6 @@
 #' @import hrbrthemes
 #' @import magrittr
 #' @import summarytools
-#' @import furrr
 #' @import doParallel
 #' @import parallel
 #' @import foreach
