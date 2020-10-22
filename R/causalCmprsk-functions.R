@@ -225,7 +225,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 } # end of .estimate.nonpar
 
 
-.sequential.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
+.sequential.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -291,7 +291,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
     }
 
-    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
+    if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
@@ -342,9 +342,9 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
       }
       #      if(i %% 25 == 0)
       #        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
-      setTxtProgressBar(pb, i)
+      if (verbose) setTxtProgressBar(pb, i)
     }
-    close(pb)
+    if (verbose) close(pb)
 
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -480,7 +480,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 
 
 
-.sequential.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
+.sequential.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -544,7 +544,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", length=nbs.rep)
     }
 
-    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
+    if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     # sequential bootstrap:
     for (i in 1:nbs.rep)
     {
@@ -596,9 +596,9 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
       }
       #     if (i %% 25 == 0)
       #       cat("We are on replication ",i," of ",nbs.rep," replications.\n")
-      setTxtProgressBar(pb, i)
+      if (verbose) setTxtProgressBar(pb, i)
     }
-    close(pb)
+    if (verbose) close(pb)
 
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
@@ -916,7 +916,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 }
 
 # Parallel Cox Fit
-.parallel.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
+.parallel.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -945,7 +945,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
       bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", length=nbs.rep)
     }
     i=0 # to remove the package NOTE
-    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
+    if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox", ".base.haz.std",
                                                       ".get.CIF",".get.S", ".get.RMT"),
                              .packages=c("survival")) %dopar%
@@ -956,10 +956,10 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
         #        if(i %% 25 == 0)
         #         cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
-        setTxtProgressBar(pb, i)
+        if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates
       }
-    close(pb)
+    if (verbose) close(pb)
     # summarize bs replications and save the results in 'res' object:
     # res is a list with 4 fields:
     # 1.time - a vector of times for which everything is estimated
@@ -1088,7 +1088,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   }
 }
 
-.parallel.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
+.parallel.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -1119,7 +1119,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     }
     i=0 # to remove the package NOTE
     # Create the progress bar.
-    pb <- txtProgressBar(min = 1, max = nbs.rep, style=3, file=stdout())
+    if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3, file=stdout())
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
                                                       ".get.CIF",".get.S", ".get.RMT"),
                              .packages=c("survival")) %dopar%
@@ -1128,12 +1128,12 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        setTxtProgressBar(pb, i)
+        if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
     #        if(i %% 25 == 0)
     #          cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
-    close(pb)
+    if (verbose) close(pb)
 
     for (k in E.set){
       bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
@@ -1299,7 +1299,10 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
 #' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using 2 cores simultaneously. The default value is FALSE.
+#' using 2 cores simultaneously. The default value is FALSE
+#' @param verbose a logical flag indicating whether to show a progress of bootstrap.
+#' The progress bar is shown only for sequential bootstrap computation.
+#' The default value is FALSE.
 #'
 #' @return  A list with the following fields:
 #' \tabular{ll}{
@@ -1342,7 +1345,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #'
 #'
 #' @export
-fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE){
+fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1365,10 +1368,10 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
   }
   else
-    .sequential.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .sequential.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
 
 }
 
@@ -1413,7 +1416,10 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
 #' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using 2 cores simultaneously. The default value is FALSE.
+#' using 2 cores simultaneously. The default value is FALSE
+#' @param verbose a logical flag indicating whether to show a progress of bootstrap.
+#' The progress bar is shown only for sequential bootstrap computation.
+#' The default value is FALSE.
 #'
 #' @return  A list with the following fields:
 #' \tabular{ll}{
@@ -1455,7 +1461,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #'
 #' @export
-fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE){
+fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1478,10 +1484,10 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
   }
   else
-    .sequential.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
+    .sequential.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
 
 }
 

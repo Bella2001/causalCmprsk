@@ -16,7 +16,8 @@ fit.cox(
   bs = FALSE,
   nbs.rep = 400,
   seed = 17,
-  parallel = FALSE
+  parallel = FALSE,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -59,7 +60,11 @@ analytical confidence intervals in \code{fit.nonpar}}
 \item{seed}{the random seed for the bootstrap, in order to make the results reproducible}
 
 \item{parallel}{a logical flag indicating whether to perform bootstrap sequentially or in parallel
-using 2 cores simultaneously. The default value is FALSE.}
+using 2 cores simultaneously. The default value is FALSE}
+
+\item{verbose}{a logical flag indicating whether to show a progress of bootstrap.
+The progress bar is shown only for sequential bootstrap computation.
+The default value is FALSE.}
 }
 \value{
 A list with the following fields:
