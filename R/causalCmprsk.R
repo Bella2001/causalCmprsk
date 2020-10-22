@@ -1,4 +1,4 @@
-#' Package for Estimation of Average Treatment Effects on Time-to-Event Outcomes with Competing Events.
+#' Package for Estimation of Average Treatment Effects (ATE) on Time-to-Event Outcomes with Competing Events.
 #'
 #' The package accompanies the paper of Charpignon et al. (2020).
 #' It can be applied to data with any number of competing events, including the case of only one type of event.
@@ -9,6 +9,12 @@
 #' The \pkg{causalCmprsk} package provides two main functions:
 #' \code{\link{fit.cox}} for Cox-based estimation
 #'  and \code{\link{fit.nonpar}} that does not assume any model for potential outcomes.
+#'  The function \code{\link{get.weights}} returns estimated weights that are aimed for
+#'  emulation of a baseline randomization in observational data where the treatment was not assigned randomly.
+#'  The function \code{\link{get.pointEst}} extracts a point estimate corresponding to a specific time point
+#'  from the time-varying functionals returned by \code{\link{fit.cox}} and \code{\link{fit.nonpar}}.
+#'  The function \code{\link{get.numAtRisk}} allows to obtain the number-at-risk statistic
+#'  in the raw and weighted data.
 #'  The illustrative examples in these functions include analysis of the
 #'  Right Heart Catheterization data (Connors et al., 1996) which is available online (\url{http://biostat.mc.vanderbilt.edu/DataSets}).
 
@@ -19,26 +25,15 @@
 #' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #'
 #' @import survival
-#' @import tidyverse
 #' @import inline
-#' @import data.table
-#' @import ggalt
-#' @import cobalt
-#' @import ggsci
-#' @import modEvA
-#' @import naniar
-#' @import readxl
-#' @import hrbrthemes
-#' @import magrittr
-#' @import summarytools
+#' @import tidyverse
 #' @import doParallel
-#' @import parallel
-#' @import foreach
 #'
-#' @importFrom stats pnorm qnorm quantile sd var
+#' @importFrom stats pnorm qnorm quantile sd var rexp as.formula binomial glm predict
 #' @importFrom utils txtProgressBar setTxtProgressBar
 #' @importFrom parallel detectCores
 #' @importFrom foreach foreach "%dopar%"
+#' @importFrom data.table rbindlist
 #'
 #' @docType package
 #' @name causalCmprsk

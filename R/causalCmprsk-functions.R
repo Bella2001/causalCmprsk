@@ -36,27 +36,41 @@
   data.frame(time=bh$time, haz=hazdiff)
 }
 
-# get.weights fits PS model, returns both PSs and requested weights. PSs estimates can be used for further diagnostics - GOF, positivity and covariates balance - see below.
-# df - a data frame containing the variables in the propensity score model, i.e.containing the treatment variable and confounders.
-# A - a character specifying the name of the outcome variable in df. treatment/exposure variable. It is assumed that A is a numeric binary indicator with 0/1 values, where A=1 is assumed a treatment group, and A=0 a control group.
-# C - a vector of character strings with variable names (potential confounders) in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-
-# wtype - a character variable indicating the type of weight.
-#The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-
-# case.w - should it be a part of a data frame? or an external vector?
-
-
-#' Fitting propensity scores model and estimating weights
+#' Fitting a logistic regression model for propensity scores and estimating weights
 #'
-#' Description...
+#' Fits a propensity scores model by logistic regression and returns both estimated propensity scores
+#' and requested weights. The estimated propensity scores can be used
+#' for further diagnostics, e.g. for testing a positivity assumption and covariate balance.
 #'
-#' @param case.w a vector of sampling weights
+#' @param df a data frame that includes a treatment indicator \code{A}  and covariates \code{C}.
+#' @param A a character specifying the name of the treatment/exposure variable.
+#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+#' is assumed a treatment group, and \code{A}=0 a control group.
+#' @param C a vector of character strings with variable names (potential confounders)
+#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+#' that will estimate treatment effects in the raw (observed) data.
+#' @param wtype a character string variable indicating the type of weights that will define the target
+#' population for which the ATE will be estimated.
+#' The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' Other possible values are "ATE", "ATT", "ATC", and "overlap".
+#' See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' @param case.w a vector of case weights.
 #'
+#' @return  A list with the following fields:
+#' \itemize{
+#' \item{\code{wtype}} a character string indicating the type of the estimated weights
+#' \item{\code{ps}} a vector of estimated propensity scores P(A=a|C=c)
+#' \item{\code{w}} a vector of estimated weights
+#' \item{\code{summary.glm}} a summary of the logistic regression fit which is done
+#'  using \code{stats::glm}} function
 #'
 #' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#'
+#' @seealso \code{\link{fit.nonpar}}, \code{\link{fit.cox}}, \code{\link{causalCmprsk}}
+#' @examples
+#' # please see our package vignette for practical examples
 #'
 #' @export
 get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
@@ -93,23 +107,56 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
   list(wtype=wtype, ps=pscore, w=wei, summary.glm=summary(p_logistic.fit))
 }
 
-# wtype - a character variable indicating the type of weight.
-# The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-# Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
 
-#' Obtaining number-at-risk statistic in the raw and weighted data
+#' Number-at-risk in raw and weighted data
 #'
 #'
-#' Description ...
+#' Obtaining time-varying number-at-risk statistic in both raw and weighted data
 #'
-#' @param df a data frame with ...
-#' @param C vcbv
-#' @param wtype "unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
-#' population and adjusted (weighted) population wit hweights provided in wtype.
+#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' a treatment indicator \code{A}  and covariates \code{C}.
+#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param E a character string specifying the name of the "event type" variable in \code{df}.
+#' @param A a character specifying the name of the treatment/exposure variable.
+#' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+#' is assumed a treatment group, and \code{A}=0 a control group.
+#' @param C a vector of character strings with variable names (potential confounders)
+#' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+#' The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+#' that will estimate treatment effects in the raw (observed) data.
+#' @param wtype a character string variable indicating the type of weights that will define the target
+#' population for which the ATE will be estimated.
+#' The default is "unadj" - this will not adjust for possible
+#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+#' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
+#' See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' By default \code{fit.nonpar} assumes \code{cens}=0
+#'
+#' @return  A list with two fields:
+#' \itemize{
+#' \item{\code{trt.0}} a matrix with three columns, \code{time}, \code{num} and \code{sample}
+#' corresponding to the treatment arm with \code{A}=0.
+#' The results for both weighted and unadjusted number-at-risk are returnd in  a long-format matrix.
+#' The column \code{time} is a vector of time points at which we calculate the number-at-risk.
+#' The column \code{num} is the number-at-risk.
+#' The column \code{sample} is a factor variable that gets one of two values, "Weighted" or "Unadjusted".
+#' The estimated number-at-risk in the weighted sample corresponds to the rows with \code{sample="Weighted"}.
+#' \item{\code{trt.1}} a matrix with three columns, \code{time}, \code{num} and \code{sample}
+#' corresponding to the treatment arm with \code{A}=1.
+#' The results for both weighted and unadjusted number-at-risk are returnd in  a long-format matrix.
+#' The column \code{time} is a vector of time points at which we calculate the number-at-risk.
+#' The column \code{num} is the number-at-risk.
+#' The column \code{sample} is a factor variable that gets one of two values, "Weighted" or "Unadjusted".
+#' The estimated number-at-risk in the weighted sample corresponds to the rows with \code{sample="Weighted"}.}
+#'
+#' @seealso \code{\link{get.weights}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
 #'
 #'
 #' @export
-get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
+get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 {
   X <- df[[T]]
   E <- df[[E]]
@@ -176,20 +223,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
   }
   res.a
 } # end of .estimate.nonpar
-
-
-# T - a character string specifying the name of the time-to-event variable in df
-# E - a character string specifying the name of the "event type" variable in df
-# A - a character specifying the name of the outcome variable in df. treatment/exposure variable. It is assumed that A is a numeric binary indicator with 0/1 values, where A=1 is assumed a treatment group, and A=0 a control group.
-# C - a vector of character strings with variable names (potential confounders) in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-# seed - for bs
-# cens - censoring value
-# wtype - a character variable indicating the type of weight.
-# The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-# Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-# There is also an option of "unajusted" estimation, set with wtype="unadj", that does not adjust for possible
-# treatment selection bias and does not use propensity scores weighting. It can be used, for example,
-# in data from an RCT where there is no need for emulation of baseline randomization.
 
 
 .sequential.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
@@ -446,13 +479,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
 } # end of .estimate.cox
 
 
-# T - a character string specifying the name of the time-to-event variable in df
-# E - a character string specifying the name of the "event type" variable in df
-# A - a character specifying the name of the outcome variable in df. treatment/exposure variable. It is assumed that A is a numeric binary indicator with 0/1 values, where A=1 is assumed a treatment group, and A=0 a control group.
-# C - a vector of character strings with variable names (potential confounders) in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-# seed - for bs
-# cens - censoring value
-
 
 .sequential.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
 {
@@ -515,7 +541,7 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
         bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
-      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", length=nbs.rep)
     }
 
     pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
@@ -687,12 +713,46 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="stab.ATE", cens=0)
   return(res)
 }
 
-#' Returns point estimates corresponding to a time point
-#'
+#' Returns point estimates corresponding to a specific time point
 #'
 #' @param cmprsk.obj a "cmprsk" object returned by one of the function \code{fit.cox} or \code{fit.nonpar}
 #' @param timepoint a scalar value of the time point of interest
 #'
+#' @return  A list with the following fields:
+#' \tabular{ll}{
+#' \code{time}  \tab \cr a scalar timepoint passed into the function \cr
+#' \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
+#'  fields as the number of different types of events in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} point cumulative hazard estimates
+#' \item{\code{CIF}} point cumulative incidence function estimated
+#' \item{\code{RMT}} point estimates of the restricted mean time}
+#' \tabular{ll}{
+#' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} point cumulative hazard estimates
+#' \item{\code{CIF}} point cumulative incidence function estimated
+#' \item{\code{RMT}} point estimates of the restricted mean time}
+#' \tabular{ll}{
+#' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
+#' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates: \cr}
+#' \itemize{
+#' \item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards in two treatment arms
+#' \item{\code{RD}} a point estimate of the risk difference between two treatment arms
+#' \item{\code{RR}} a point estimate of the risk ratio between two treatment arms
+#' \item{\code{ATE.RMT}} a point estimate of the restricted mean time difference
+#'  between two treatment arms}
+#'
+#' @seealso \code{\link{fit.cox}}, \code{\link{fit.nonpar}}, \code{\link{causalCmprsk}}
+#' @examples
+#' # please see our package vignette for practical examples
 #'
 #' @export
 get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
@@ -856,8 +916,6 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 }
 
 # Parallel Cox Fit
-
-
 .parallel.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed)
 {
   X <- df[[T]]
@@ -884,9 +942,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <-
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
-      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", len=nbs.rep)
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- vector("double", length=nbs.rep)
     }
-
+    i=0 # to remove the package NOTE
     pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox", ".base.haz.std",
                                                       ".get.CIF",".get.S", ".get.RMT"),
@@ -1059,6 +1117,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.CIF$RD[[paste("Ev=", k, sep="")]] <- bs.CIF$RR[[paste("Ev=", k, sep="")]] <-
         bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- matrix(nrow=nbs.rep, ncol=ntime)
     }
+    i=0 # to remove the package NOTE
     # Create the progress bar.
     pb <- txtProgressBar(min = 1, max = nbs.rep, style=3, file=stdout())
     bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
@@ -1203,11 +1262,17 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 
 #' Cox-based estimation of ATE corresponding to the target population
 #'
+#' Implements Cox-based estimation  of ATE assuming a structural proportional hazards model for two potential outcomes.
+#' It provides three measures of treatment effects on time-to-event outcomes:
+#' (1) cause-specific hazard ratios which are time-dependent measures under a nonparametric model,
+#' (2) risk-based measures such as cause-specific risk differences and cause-specific risk ratios, and
+#' (3) restricted-mean-time differences which quantify how much time on average was lost (or gained)
+#' due to treatment by some specified time point.
+#' Please see our package vignette for more details.
 #'
-#' Description ...
 #'
-#'
-#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
+#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' a treatment indicator \code{A}  and covariates \code{C}.
 #' @param T a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
 #' @param A a character specifying the name of the treatment/exposure variable.
@@ -1215,15 +1280,66 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' is assumed a treatment group, and \code{A}=0 a control group.
 #' @param C a vector of character strings with variable names (potential confounders)
 #' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
-#' @param seed for the bootstrap
-#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
-#' @param wtype a character variable indicating the type of weight.
-#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
+#' The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+#' that will estimate treatment effects in the raw (observed) data.
+#' @param wtype a character string variable indicating the type of weights that will define the target
+#' population for which the ATE will be estimated.
+#' The default is "unadj" - this will not adjust for possible
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from an RCT where there is no need for emulation of baseline randomization.
+#' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
+#' See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' By default \code{fit.nonpar} assumes \code{cens}=0
+#' @param conf.level the confidence level that will be used in the bootstrap confidence intervals.
+#' The default is 0.95
+#' @param bs a logical flag indicating whether to perform bootstrap in order to obtain confidence intervals. There are no
+#' analytical confidence intervals in \code{fit.nonpar}
+#' @param nbs.rep number of bootstrap replications
+#' @param seed the random seed for the bootstrap, in order to make the results reproducible
+#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
+#' using several processor cores simultaneous. The number of the cores is chosen automatically as a half
+#'  of the number of identified cores
+#'
+#' @return  A list with the following fields:
+#' \tabular{ll}{
+#' \code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
+#' \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
+#'  fields as the number of different types of events in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} a vector of cumulative hazard estimates
+#' \item{\code{CIF}} a vector of cumulative incidence functions
+#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \tabular{ll}{
+#' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} a vector of cumulative hazard estimates
+#' \item{\code{CIF}} a vector of cumulative incidence functions
+#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \tabular{ll}{
+#' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
+#' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates: \cr}
+#' \itemize{
+#' \item{\code{log.CumHazR}} an estimate of the log of the hazard ratio. It is a scalar since the Cox model is assumed.
+#' \item{\code{RD}} a vector of time-varying risk difference between two treatment arms
+#' \item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
+#' \item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
+#'  between two treatment arms}
+#'
+#' @seealso \code{\link{fit.nonpar}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
+#' @examples
+#' # please see our package vignette for practical examples
+#'
+#' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #'
 #'
 #' @export
@@ -1257,10 +1373,18 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' Nonparametric estimation of ATE corresponding to the target population
 #'
 #'
-#' Description ...
+#' Implements nonparametric estimation (based on the weighted Aalen-Johansen estimator) of ATE meaning that
+#' it does not assume any model for potential outcomes.
+#' It provides three measures of treatment effects on time-to-event outcomes:
+#' (1) cause-specific hazard ratios which are time-dependent measures under a nonparametric model,
+#' (2) risk-based measures such as cause-specific risk differences and cause-specific risk ratios, and
+#' (3) restricted-mean-time differences which quantify how much time on average was lost (or gained)
+#' due to treatment by some specified time point.
+#' Please see our package vignette for more details.
 #'
 #'
-#' @param df a data frame with time to event, type of event, treatment indicator and covariates.
+#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' a treatment indicator \code{A}  and covariates \code{C}.
 #' @param T a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
 #' @param A a character specifying the name of the treatment/exposure variable.
@@ -1268,16 +1392,66 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' is assumed a treatment group, and \code{A}=0 a control group.
 #' @param C a vector of character strings with variable names (potential confounders)
 #' in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
-#' @param C the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data
-#' @param seed for the bootstrap
-#' @param cens integer value in \code{E} that corresponds to censorings resorded in \code{T}.
-#' @param wtype a character variable indicating the type of weight.
-#' The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
+#' The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+#' that will estimate treatment effects in the raw (observed) data.
+#' @param wtype a character string variable indicating the type of weights that will define the target
+#' population for which the ATE will be estimated.
+#' The default is "unadj" - this will not adjust for possible
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from an RCT where there is no need for emulation of baseline randomization.
+#' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
+#' See Table 1 from Li, Morgan, and Zaslavsky (2018).
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' By default \code{fit.nonpar} assumes \code{cens}=0
+#' @param conf.level the confidence level that will be used in the bootstrap confidence intervals.
+#' The default is 0.95
+#' @param bs a logical flag indicating whether to perform bootstrap in order to obtain confidence intervals. There are no
+#' analytical confidence intervals in \code{fit.nonpar}
+#' @param nbs.rep number of bootstrap replications
+#' @param seed the random seed for the bootstrap, in order to make the results reproducible
+#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
+#' using several processor cores simultaneous. The number of the cores is chosen automatically as a half
+#'  of the number of identified cores
 #'
+#' @return  A list with the following fields:
+#' \tabular{ll}{
+#' \code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
+#' \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
+#'  fields as the number of different types of events in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} a vector of cumulative hazard estimates
+#' \item{\code{CIF}} a vector of cumulative incidence functions
+#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \tabular{ll}{
+#' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
+#' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates:  \cr }
+#' \itemize{
+#' \item{\code{CumHaz}} a vector of cumulative hazard estimates
+#' \item{\code{CIF}} a vector of cumulative incidence functions
+#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \tabular{ll}{
+#' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
+#' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
+#'  fields as the number of different types of events  in the data set.
+#' For each type of event there is a list of estimates: \cr}
+#' \itemize{
+#' \item{\code{log.CumHazR}} a vector of the log of the time-varying ratio of hazards in two treatment arms
+#' \item{\code{RD}} a vector of time-varying risk difference between two treatment arms
+#' \item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
+#' \item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
+#'  between two treatment arms}
+#'
+#' @seealso \code{\link{fit.cox}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
+#' @examples
+#' # please see our package vignette for practical examples
+#'
+#' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #'
 #' @export
 fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){

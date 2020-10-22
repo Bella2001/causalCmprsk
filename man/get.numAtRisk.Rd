@@ -2,18 +2,60 @@
 % Please edit documentation in R/causalCmprsk-functions.R
 \name{get.numAtRisk}
 \alias{get.numAtRisk}
-\title{Obtaining number-at-risk statistic in the raw and weighted data}
+\title{Number-at-risk in raw and weighted data}
 \usage{
-get.numAtRisk(df, T, E, A, C = NULL, wtype = "stab.ATE", cens = 0)
+get.numAtRisk(df, T, E, A, C = NULL, wtype = "unadj", cens = 0)
 }
 \arguments{
-\item{df}{a data frame with ...}
+\item{df}{a data frame that includes time-to-event \code{T}, type of event \code{E},
+a treatment indicator \code{A}  and covariates \code{C}.}
 
-\item{C}{vcbv}
+\item{T}{a character string specifying the name of the time-to-event variable in \code{df}.}
 
-\item{wtype}{"unadj" is not an option here, because the function estimates the number at risk for both unadjusted (raw)
-population and adjusted (weighted) population wit hweights provided in wtype.}
+\item{E}{a character string specifying the name of the "event type" variable in \code{df}.}
+
+\item{A}{a character specifying the name of the treatment/exposure variable.
+It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+is assumed a treatment group, and \code{A}=0 a control group.}
+
+\item{C}{a vector of character strings with variable names (potential confounders)
+in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+that will estimate treatment effects in the raw (observed) data.}
+
+\item{wtype}{a character string variable indicating the type of weights that will define the target
+population for which the ATE will be estimated.
+The default is "unadj" - this will not adjust for possible
+treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
+See Table 1 from Li, Morgan, and Zaslavsky (2018).
+"stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).}
+
+\item{cens}{an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+By default \code{fit.nonpar} assumes \code{cens}=0}
+}
+\value{
+A list with two fields:
+\itemize{
+\item{\code{trt.0}} a matrix with three columns, \code{time}, \code{num} and \code{sample}
+corresponding to the treatment arm with \code{A}=0.
+The results for both weighted and unadjusted number-at-risk are returnd in  a long-format matrix.
+The column \code{time} is a vector of time points at which we calculate the number-at-risk.
+The column \code{num} is the number-at-risk.
+The column \code{sample} is a factor variable that gets one of two values, "Weighted" or "Unadjusted".
+The estimated number-at-risk in the weighted sample corresponds to the rows with \code{sample="Weighted"}.
+\item{\code{trt.1}} a matrix with three columns, \code{time}, \code{num} and \code{sample}
+corresponding to the treatment arm with \code{A}=1.
+The results for both weighted and unadjusted number-at-risk are returnd in  a long-format matrix.
+The column \code{time} is a vector of time points at which we calculate the number-at-risk.
+The column \code{num} is the number-at-risk.
+The column \code{sample} is a factor variable that gets one of two values, "Weighted" or "Unadjusted".
+The estimated number-at-risk in the weighted sample corresponds to the rows with \code{sample="Weighted"}.}
 }
 \description{
-Description ...
+Obtaining time-varying number-at-risk statistic in both raw and weighted data
+}
+\seealso{
+\code{\link{get.weights}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
 }

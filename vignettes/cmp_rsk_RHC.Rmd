@@ -14,31 +14,6 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-<!--https://www.bioconductor.org/packages/devel/bioc/vignettes/BiocStyle/inst/doc/AuthoringRmdVignettes.html
-Authoring R Markdown vignettes
-how to put affiliations, emails etc....
-
----
-title: "Nonparametric and Cox-based estimation of ATE in competing risks"
-subtitle: "`causalCmprsk` package"
-author: "Bella Vakulenko-Lagun, Colin Magdamo, Marie-Laure Charpignon, Bang Zheng, Mark Albers, Sudeshna Das"
-date: "`r Sys.Date()`"
-output: 
-  bookdown::html_document2:
-    css: styles.css
-    toc: true
-    number_sections: false
-    theme: cayman
-    highlight: vignette
-    base_format: prettydoc::html_pretty
-bibliography: references.bib
-vignette: >
-  %\VignetteIndexEntry{Nonparametric and Cox-based estimation of ATE in competing risks}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
----
--->
-
 
 
 
@@ -325,21 +300,16 @@ In survival data, the Bayesian bootstrap is expected to provide a more stable al
 
 ```{r cran_packages, echo=TRUE, include=TRUE, message=FALSE, warning=FALSE}
 library(survival)
-library(dplyr)
-library(data.table) # check if I use it!!!
-library(ggplot2)
-library(ggalt) # for stepribbon
 library(tidyverse)
+library(ggalt) # for stepribbon
 library(cobalt)
 library(ggsci) # Nature Color palette
 library(modEvA) # for H-L GOF test
 library(naniar) # for exploring missingness 
-library(readxl)
 library(knitr)
 library(kableExtra)
-library(magrittr)
-library(summarytools) # for summary distributions of covariates - check if I use it!!!
-library(DT) # check if I use it!!!!
+library(summarytools)  
+library(DT) 
 library(Hmisc)
 
 library(causalCmprsk)
@@ -757,24 +727,24 @@ We estimate all the [parameters](#estimands) using both nonparametric and Cox-ba
 # overlap weights========================:
 # Nonparametric estimation:
 res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = TRUE)
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5, seed=17, parallel = TRUE)
 # Cox-based estimation:
 res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 # stab.ATE weights==========================:
 # Nonparametric estimation:
 res.stab.ATE <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 # Cox-based estimation:
 res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 # unadjusted analysis========================:
 # Nonparametric estimation:
 res.un <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 # Cox-based estimation:
 res.cox.un <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 ```
 
 We aggregate log-ratios of cumulative hazards from nonparametric and Cox-based estimation into one data frame for each type of weights:
@@ -1239,9 +1209,9 @@ Below we illustrate how to use `causalCmprsk` in survival data with only one tim
 ```{r}
 # nonparametric:
 # acm=all-cause mortality
-res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 # Cox-based estimation:
-res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200)
+res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
 ```
 
 

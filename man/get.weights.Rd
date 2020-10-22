@@ -2,18 +2,53 @@
 % Please edit documentation in R/causalCmprsk-functions.R
 \name{get.weights}
 \alias{get.weights}
-\title{Fitting propensity scores model and estimating weights}
+\title{Fitting a logistic regression model for propensity scores and estimating weights}
 \usage{
 get.weights(df, A, C, wtype = "stab.ATE", case.w = NULL)
 }
 \arguments{
-\item{case.w}{a vector of sampling weights}
+\item{df}{a data frame that includes a treatment indicator \code{A}  and covariates \code{C}.}
+
+\item{A}{a character specifying the name of the treatment/exposure variable.
+It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
+is assumed a treatment group, and \code{A}=0 a control group.}
+
+\item{C}{a vector of character strings with variable names (potential confounders)
+in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+that will estimate treatment effects in the raw (observed) data.}
+
+\item{wtype}{a character string variable indicating the type of weights that will define the target
+population for which the ATE will be estimated.
+The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+Other possible values are "ATE", "ATT", "ATC", and "overlap".
+See Table 1 from Li, Morgan, and Zaslavsky (2018).}
+
+\item{case.w}{a vector of case weights.}
+}
+\value{
+A list with the following fields:
+\itemize{
+\item{\code{wtype}} a character string indicating the type of the estimated weights
+\item{\code{ps}} a vector of estimated propensity scores P(A=a|C=c)
+\item{\code{w}} a vector of estimated weights
+\item{\code{summary.glm}} a summary of the logistic regression fit which is done
+ using \code{stats::glm}} function
 }
 \description{
-Description...
+Fits a propensity scores model by logistic regression and returns both estimated propensity scores
+and requested weights. The estimated propensity scores can be used
+for further diagnostics, e.g. for testing a positivity assumption and covariate balance.
+}
+\examples{
+# please see our package vignette for practical examples
+
 }
 \references{
 F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 
 M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+}
+\seealso{
+\code{\link{fit.nonpar}}, \code{\link{fit.cox}}, \code{\link{causalCmprsk}}
 }

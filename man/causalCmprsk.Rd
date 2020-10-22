@@ -3,7 +3,7 @@
 \docType{package}
 \name{causalCmprsk}
 \alias{causalCmprsk}
-\title{Package for Estimation of Average Treatment Effects on Time-to-Event Outcomes with Competing Events.}
+\title{Package for Estimation of Average Treatment Effects (ATE) on Time-to-Event Outcomes with Competing Events.}
 \description{
 The package accompanies the paper of Charpignon et al. (2020).
 It can be applied to data with any number of competing events, including the case of only one type of event.
@@ -15,6 +15,12 @@ ATT, ATC and overlap weights, as described in Li et al. (2018).
 The \pkg{causalCmprsk} package provides two main functions:
 \code{\link{fit.cox}} for Cox-based estimation
  and \code{\link{fit.nonpar}} that does not assume any model for potential outcomes.
+ The function \code{\link{get.weights}} returns estimated weights that are aimed for
+ emulation of a baseline randomization in observational data where the treatment was not assigned randomly.
+ The function \code{\link{get.pointEst}} extracts a point estimate corresponding to a specific time point
+ from the time-varying functionals returned by \code{\link{fit.cox}} and \code{\link{fit.nonpar}}.
+ The function \code{\link{get.numAtRisk}} allows to obtain the number-at-risk statistic
+ in the raw and weighted data.
  The illustrative examples in these functions include analysis of the
  Right Heart Catheterization data (Connors et al., 1996) which is available online (\url{http://biostat.mc.vanderbilt.edu/DataSets}).
 }

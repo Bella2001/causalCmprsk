@@ -18,26 +18,26 @@ Imports:
     survival,
     inline,
     tidyverse,
-    data.table,
+    doParallel,
+    parallel,
+    utils,
+    foreach,
+    data.table
+RoxygenNote: 7.1.1
+Suggests: 
+    knitr,
+    rmarkdown,
+    bookdown,
     ggalt,
     cobalt,
     ggsci,
     modEvA,
     naniar,
-    readxl,
+    DT,
+    Hmisc,
     hrbrthemes,
-    magrittr,
     summarytools,
-    kableExtra,
-    doParallel,
-    parallel,
-    utils,
-    foreach
-RoxygenNote: 7.1.1
-Suggests: 
-    knitr,
-    rmarkdown,
-    bookdown
+    kableExtra
 VignetteBuilder: knitr
 URL: https://github.com/Bella2001/causalCmprsk
 BugReports: https://github.com/Bella2001/causalCmprsk/issues

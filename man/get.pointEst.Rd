@@ -2,7 +2,7 @@
 % Please edit documentation in R/causalCmprsk-functions.R
 \name{get.pointEst}
 \alias{get.pointEst}
-\title{Returns point estimates corresponding to a time point}
+\title{Returns point estimates corresponding to a specific time point}
 \usage{
 get.pointEst(cmprsk.obj, timepoint)
 }
@@ -11,6 +11,46 @@ get.pointEst(cmprsk.obj, timepoint)
 
 \item{timepoint}{a scalar value of the time point of interest}
 }
+\value{
+A list with the following fields:
+\tabular{ll}{
+\code{time}  \tab \cr a scalar timepoint passed into the function \cr
+\code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
+corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
+ fields as the number of different types of events in the data set.
+For each type of event there is a list of estimates:  \cr }
+\itemize{
+\item{\code{CumHaz}} point cumulative hazard estimates
+\item{\code{CIF}} point cumulative incidence function estimated
+\item{\code{RMT}} point estimates of the restricted mean time}
+\tabular{ll}{
+\code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
+corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
+ fields as the number of different types of events  in the data set.
+For each type of event there is a list of estimates:  \cr }
+\itemize{
+\item{\code{CumHaz}} point cumulative hazard estimates
+\item{\code{CIF}} point cumulative incidence function estimated
+\item{\code{RMT}} point estimates of the restricted mean time}
+\tabular{ll}{
+\code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
+corresponding to the type of event \code{E}. \code{trt.eff} has the number of
+ fields as the number of different types of events  in the data set.
+For each type of event there is a list of estimates: \cr}
+\itemize{
+\item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards in two treatment arms
+\item{\code{RD}} a point estimate of the risk difference between two treatment arms
+\item{\code{RR}} a point estimate of the risk ratio between two treatment arms
+\item{\code{ATE.RMT}} a point estimate of the restricted mean time difference
+ between two treatment arms}
+}
 \description{
-Returns point estimates corresponding to a time point
+Returns point estimates corresponding to a specific time point
+}
+\examples{
+# please see our package vignette for practical examples
+
+}
+\seealso{
+\code{\link{fit.cox}}, \code{\link{fit.nonpar}}, \code{\link{causalCmprsk}}
 }

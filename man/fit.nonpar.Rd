@@ -20,7 +20,8 @@ fit.nonpar(
 )
 }
 \arguments{
-\item{df}{a data frame with time to event, type of event, treatment indicator and covariates.}
+\item{df}{a data frame that includes time-to-event \code{T}, type of event \code{E},
+a treatment indicator \code{A}  and covariates \code{C}.}
 
 \item{T}{a character string specifying the name of the time-to-event variable in \code{df}.}
 
@@ -30,19 +31,89 @@ fit.nonpar(
 It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
 is assumed a treatment group, and \code{A}=0 a control group.}
 
-\item{C}{the default value is NULL corresponding to wtype="unadj", i.e. using raw, unweighted data}
+\item{C}{a vector of character strings with variable names (potential confounders)
+in the logistic regression model for Propensity Scores, i.e. P(A=1|C=c).
+The default value of \code{C} is NULL corresponding to \code{wtype}="unadj"
+that will estimate treatment effects in the raw (observed) data.}
 
-\item{wtype}{a character variable indicating the type of weight.
-The default is "stab.ATE" defined as w_stab=P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-Other possible values are "ATE", "ATT", "ATC" and "overlap". See Table 1 from Li, Morgan, and Zaslavsky (2018).
-There is also an option of "unajusted" estimation, by settinh wtype="unadj" - this will not adjust for possible
+\item{wtype}{a character string variable indicating the type of weights that will define the target
+population for which the ATE will be estimated.
+The default is "unadj" - this will not adjust for possible
 treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-in data from an RCT where there is no need for emulation of baseline randomization.}
+in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
+See Table 1 from Li, Morgan, and Zaslavsky (2018).
+"stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).}
 
-\item{cens}{integer value in \code{E} that corresponds to censorings resorded in \code{T}.}
+\item{cens}{an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+By default \code{fit.nonpar} assumes \code{cens}=0}
 
-\item{seed}{for the bootstrap}
+\item{conf.level}{the confidence level that will be used in the bootstrap confidence intervals.
+The default is 0.95}
+
+\item{bs}{a logical flag indicating whether to perform bootstrap in order to obtain confidence intervals. There are no
+analytical confidence intervals in \code{fit.nonpar}}
+
+\item{nbs.rep}{number of bootstrap replications}
+
+\item{seed}{the random seed for the bootstrap, in order to make the results reproducible}
+
+\item{parallel}{a logical flag indicating whether to perform bootstrap sequentially or in parallel
+using several processor cores simultaneous. The number of the cores is chosen automatically as a half
+ of the number of identified cores}
+}
+\value{
+A list with the following fields:
+\tabular{ll}{
+\code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
+\code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
+corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
+ fields as the number of different types of events in the data set.
+For each type of event there is a list of estimates:  \cr }
+\itemize{
+\item{\code{CumHaz}} a vector of cumulative hazard estimates
+\item{\code{CIF}} a vector of cumulative incidence functions
+\item{\code{RMT}} a vector of restricted mean time estimates}
+\tabular{ll}{
+\code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
+corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
+ fields as the number of different types of events  in the data set.
+For each type of event there is a list of estimates:  \cr }
+\itemize{
+\item{\code{CumHaz}} a vector of cumulative hazard estimates
+\item{\code{CIF}} a vector of cumulative incidence functions
+\item{\code{RMT}} a vector of restricted mean time estimates}
+\tabular{ll}{
+\code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
+corresponding to the type of event \code{E}. \code{trt.eff} has the number of
+ fields as the number of different types of events  in the data set.
+For each type of event there is a list of estimates: \cr}
+\itemize{
+\item{\code{log.CumHazR}} a vector of the log of the time-varying ratio of hazards in two treatment arms
+\item{\code{RD}} a vector of time-varying risk difference between two treatment arms
+\item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
+\item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
+ between two treatment arms}
 }
 \description{
-Description ...
+Implements nonparametric estimation (based on the weighted Aalen-Johansen estimator) of ATE meaning that
+it does not assume any model for potential outcomes.
+It provides three measures of treatment effects on time-to-event outcomes:
+(1) cause-specific hazard ratios which are time-dependent measures under a nonparametric model,
+(2) risk-based measures such as cause-specific risk differences and cause-specific risk ratios, and
+(3) restricted-mean-time differences which quantify how much time on average was lost (or gained)
+due to treatment by some specified time point.
+Please see our package vignette for more details.
+}
+\examples{
+# please see our package vignette for practical examples
+
+}
+\references{
+F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+
+M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+}
+\seealso{
+\code{\link{fit.cox}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
 }
