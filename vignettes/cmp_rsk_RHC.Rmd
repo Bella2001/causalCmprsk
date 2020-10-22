@@ -28,7 +28,7 @@ The `causalCmprsk` package accompanies the paper of @ADmet and is designed for e
 
 - It implements different weights representing different target populations. `ATE` and `stab.ATE` weights aim to estimate average treatment effects for the original population. `ATT` weights target average treatment effects for the population of treated, and `ATC` weights correspond to the population of untreated. `overlap` weights aim to estimate average treatment effects for the **overlap population**, that is the population with the largest equipose regarding the treatment. 
 
-- It uses Bayesian bootstrap for estimation of uncertainty. Bayesian bootstrap is considered a more stable alternative to the simple bootstrap for time-to-event data. We implemented fast parallel computing to  speed up bootstrap replications.
+- It uses Bayesian bootstrap for estimation of uncertainty. Bayesian bootstrap is considered a more stable alternative to the simple bootstrap for time-to-event data. We implemented parallel computing to  speed up bootstrap replications.
 
 - It can be used for a Randomized Controlled Trials setting when there is no need for emulation of baseline randomization, by using `unadj` option in functions `fit.nonpar` and `fit.cox`.
 
@@ -680,7 +680,7 @@ The `stab.ATE` weighting is expected to produce a population which is similar to
 
 ```{r  label=ATEwdistr, fig.height=5, fig.width=5, fig.align="center" ,  message=FALSE, warning=FALSE, fig.cap="Distribution of stab.ATE weights."}
 ggplot(rhc.ps, aes(x = stab.ATE.w, fill = trt, color=trt)) +  
-  geom_histogram(alpha = 0.4) + scale_fill_npg() + scale_color_npg()+ theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.8, 0.8),
+  geom_histogram(alpha = 0.4, bins=30) + scale_fill_npg() + scale_color_npg()+ theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.8, 0.8),
           legend.background=element_rect(fill="transparent")) + ggtitle("Distribution of stab.ATE weights")
 ```
 
@@ -695,7 +695,7 @@ Figure \@ref(fig:overlapdistr) shows the distributions of overlap weights.
 
 ```{r, label=overlapdistr, fig.height=5, fig.width=5, fig.align="center" ,  message=FALSE, warning=FALSE, fig.cap="Distribution of overlap weights."}
 ggplot(rhc.ps, aes(x = overlap.w, fill = trt, color=trt)) +  
-  geom_histogram(alpha = 0.4) + scale_fill_npg() + scale_color_npg()+ theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.8, 0.8),
+  geom_histogram(alpha = 0.4, bins=30) + scale_fill_npg() + scale_color_npg()+ theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.8, 0.8),
           legend.background=element_rect(fill="transparent")) + ggtitle("Distribution of overlap weights")
 ```
 
@@ -723,31 +723,37 @@ In our analysis on RHC data, we aim to distinguish between the reasons of the en
 Two main functions, `fit.cox` and `fit.nonpar`, take care of calling `get.weights` internally, and there is no need in running `get.weights` prior to `fit.cox` or `fit.nonpar`. 
 
 We estimate all the [parameters](#estimands) using both nonparametric and Cox-based approaches, for both `stab.ATE` and overlap weights:
+
 ```{r}
 # overlap weights========================:
 # Nonparametric estimation:
 res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5, seed=17, parallel = TRUE)
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
 # Cox-based estimation:
 res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
 # stab.ATE weights==========================:
 # Nonparametric estimation:
 res.stab.ATE <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+                          seed=17, parallel = FALSE)
 # Cox-based estimation:
 res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+                          seed=17, parallel = FALSE)
 # unadjusted analysis========================:
 # Nonparametric estimation:
 res.un <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+                     seed=17, parallel = FALSE)
 # Cox-based estimation:
 res.cox.un <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+                      seed=17, parallel = FALSE)
 ```
 
 We aggregate log-ratios of cumulative hazards from nonparametric and Cox-based estimation into one data frame for each type of weights:
+
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 get.logCumHR <- function(res, res.cox)
 {
@@ -1209,9 +1215,9 @@ Below we illustrate how to use `causalCmprsk` in survival data with only one tim
 ```{r}
 # nonparametric:
 # acm=all-cause mortality
-res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=5)
+res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
 ```
 
 

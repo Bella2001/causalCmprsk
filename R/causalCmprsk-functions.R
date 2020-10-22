@@ -969,16 +969,16 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 
     # aggregate all bootstrap replications
     for (k in E.set){
-      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
-      bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
-      bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
-      bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
-      bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
-      bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
-      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list((map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']])))))
-      bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
-      bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
-      bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
+      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+      bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
+      bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
+      bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+      bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
+      bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list((purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']])))))
+      bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
+      bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
+      bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
     }
 
     alpha = 1-conf.level
@@ -1136,16 +1136,16 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     close(pb)
 
     for (k in E.set){
-      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
-      bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
-      bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
-      bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
-      bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
-      bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
-      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']]))))
-      bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
-      bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
-      bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
+      bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+      bs.CIF$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['CIF']]))))
+      bs.RMT$trt.0[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.0']][[paste("Ev=", k, sep="")]][['RMT']]))))
+      bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CumHaz']]))))
+      bs.CIF$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['CIF']]))))
+      bs.RMT$trt.1[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.1']][[paste("Ev=", k, sep="")]][['RMT']]))))
+      bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['log.CumHazR']]))))
+      bs.CIF$RD[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RD']]))))
+      bs.CIF$RR[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['RR']]))))
+      bs.RMT$ATE[[paste("Ev=", k, sep="")]] <- t(rbindlist(list(purrr::map(bs_aggregates,~.x[['trt.eff']][[paste("Ev=", k, sep="")]][['ATE.RMT']]))))
     }
 
 
@@ -1299,8 +1299,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
 #' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using several processor cores simultaneous. The number of the cores is chosen automatically as a half
-#'  of the number of identified cores
+#' using 2 cores simultaneously. The default value is FALSE.
 #'
 #' @return  A list with the following fields:
 #' \tabular{ll}{
@@ -1343,7 +1342,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #'
 #'
 #' @export
-fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
+fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1353,14 +1352,17 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
-      num_cores <- round(parallel::detectCores()/2,digits = 0)
+      #      num_cores <- round(parallel::detectCores()/2,digits = 0)
+      num_cores <- 2
       cluster <- parallel::makeCluster(num_cores)
       doParallel::registerDoParallel(cl = cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = T)){
-      doParallel::registerDoParallel()
+      num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
+      cluster <- parallel::makeCluster(num_cores)
+      doParallel::registerDoParallel(cl=cluster)
     }
 
     .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)
@@ -1411,8 +1413,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
 #' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using several processor cores simultaneous. The number of the cores is chosen automatically as a half
-#'  of the number of identified cores
+#' using 2 cores simultaneously. The default value is FALSE.
 #'
 #' @return  A list with the following fields:
 #' \tabular{ll}{
@@ -1454,7 +1455,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 #'
 #' @export
-fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = TRUE){
+fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1464,14 +1465,17 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
 
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = T)) {
-      num_cores <- round(parallel::detectCores()/2,digits = 0)
+#      num_cores <- round(parallel::detectCores()/2,digits = 0)
+      num_cores <- 2
       cluster <- parallel::makeCluster(num_cores)
       doParallel::registerDoParallel(cl = cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = T)){
-      doParallel::registerDoParallel()
+      num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
+      cluster <- parallel::makeCluster(num_cores)
+      doParallel::registerDoParallel(cl=cluster)
     }
 
     .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed)

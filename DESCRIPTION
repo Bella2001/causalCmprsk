@@ -17,17 +17,18 @@ Depends:
 Imports: 
     survival,
     inline,
-    tidyverse,
     doParallel,
     parallel,
     utils,
     foreach,
-    data.table
+    data.table,
+    purrr
 RoxygenNote: 7.1.1
 Suggests: 
     knitr,
     rmarkdown,
     bookdown,
+    tidyverse,
     ggalt,
     cobalt,
     ggsci,

@@ -26,14 +26,14 @@
 #'
 #' @import survival
 #' @import inline
-#' @import tidyverse
-#' @import doParallel
 #'
 #' @importFrom stats pnorm qnorm quantile sd var rexp as.formula binomial glm predict
-#' @importFrom utils txtProgressBar setTxtProgressBar
-#' @importFrom parallel detectCores
+#' @importFrom utils txtProgressBar setTxtProgressBar globalVariables
+#' @importFrom parallel detectCores makeCluster
 #' @importFrom foreach foreach "%dopar%"
 #' @importFrom data.table rbindlist
+#' @importFrom purrr map
+#' @importFrom doParallel registerDoParallel
 #'
 #' @docType package
 #' @name causalCmprsk
