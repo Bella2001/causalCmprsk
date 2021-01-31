@@ -1,5 +1,5 @@
 ---
-title: "Nonparametric and Cox-based estimation of ATE in competing risks using `causalCmprsk` package"
+title: "Nonparametric and Cox-based estimation of ATE in competing risks using 'causalCmprsk' package"
 author: "[Bella Vakulenko-Lagun](https://stat.hevra.haifa.ac.il/index.php/en/academic-staff-he/bella-vakulenko-lagun), Colin Magdamo, Marie-Laure Charpignon, Bang Zheng, Mark Albers, Sudeshna Das"
 date: "`r Sys.Date()`"
 output: 
@@ -47,7 +47,7 @@ The `causalCmprsk` package accompanies the paper of @ADmet and is designed for e
 # Right Heart Catheterization (RHC) data
 ***
 
-We will illustrate how to use `causalCmprsk` package by analyzing data from an observational study on right heart catheterization (RHC) procedure. The data were obtained from http://biostat.mc.vanderbilt.edu/DataSets.
+We will illustrate how to use `causalCmprsk` package by analyzing data from an observational study on right heart catheterization (RHC) procedure. The data were obtained from http://hbiostat.org/data/ courtesy of the Vanderbilt University Department of Biostatistics.
 
 RHC data were collected by @Connors with the aim to evaluate the effectiveness and safety of RHC procedure for critically ill patients admitted to ICUs. The study of @Connors appeared to be influential since most of the physicians strongly believed in the benefits of RHC procedure, and therefore conducting a clinical trial to test RHC was unethical. @Connors collected an extensive set of covariates in order to adjust for treatment assignment bias, and their results showed that RHC might be harmful. Following that, this data set drew attention of many researchers, the data were multiply reanalyzed, for example, by @Lin, @Tan2006, @Zaslavsky, @Love, @Mao, @Tchetgen, among many others.
 
@@ -330,37 +330,10 @@ st_options(plain.ascii = FALSE,        # Always use this option in Rmd documents
 
 We follow the steps of @Love of reading, reformatting, reordering and cleaning RHC data:
 ```{r code1, echo=TRUE}
-column_types_rhc <- 
-  cols(urin1 = "d", meanbp1 = "d", resp1 = "d",
-       swang1 = col_factor(c("No RHC", "RHC")),
-       death = col_factor(c("No", "Yes")),
-       sex = col_factor(c("Male", "Female")),
-       cat1 = col_factor(c("ARF", "CHF", "Cirrhosis", "Colon Cancer", "Coma", "COPD",
-                           "Lung Cancer", "MOSF w/Malignancy", "MOSF w/Sepsis")),
-       # Cat1 - Primary disease category
-       cat2 = col_factor(c("ARF", "CHF", "Cirrhosis", "Colon Cancer", "Coma", "COPD",
-                           "Lung Cancer", "MOSF w/Malignancy", "MOSF w/Sepsis")),
-       # Cat2 - Secondary disease category
-       dnr1 = col_factor(c("No", "Yes")),
-       card = col_factor(c("No", "Yes")),
-       gastr = col_factor(c("No", "Yes")),
-       hema = col_factor(c("No", "Yes")),
-       meta = col_factor(c("No", "Yes")),
-       neuro = col_factor(c("No", "Yes")),
-       ortho = col_factor(c("No", "Yes")),
-       renal = col_factor(c("No", "Yes")),
-       resp = col_factor(c("No", "Yes")),
-       seps = col_factor(c("No", "Yes")),
-       trauma = col_factor(c("No", "Yes")),
-       income = col_factor(c("Under $11k", "$11-$25k", "$25-$50k", "> $50k")),
-       ninsclas = col_factor(c("Private", "Private & Medicare", "Medicare", 
-                               "Medicare & Medicaid", "Medicaid", "No insurance")),
-       race = col_factor(c("white", "black", "other")),
-       ca = col_factor(c("No", "Yes", "Metastatic"))
-  )
-suppressWarnings(rhc_raw <- read_csv("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv", 
-                    col_types = column_types_rhc))
+getHdata(rhc) # loading data using the Hmisc package
+rhc_raw <- rhc
 ```
+
 We will not use variables `adld3p` and `urin1` due to the high percent of missing values:
 ```{r}
 miss.report <- rhc_raw %>% miss_var_summary()
@@ -727,28 +700,28 @@ We estimate all the [parameters](#estimands) using both nonparametric and Cox-ba
 ```{r}
 # overlap weights========================:
 # Nonparametric estimation:
-res.overlap <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
+res.overlap <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE) # The small number of bootstrap replications (nbs.rep=80) was chosen for illustration purposes.  
 # Cox-based estimation:
-res.cox.overlap <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
+res.cox.overlap <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
 # stab.ATE weights==========================:
 # Nonparametric estimation:
-res.stab.ATE <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+res.stab.ATE <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
                           seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.stab.ATE <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+res.cox.stab.ATE <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=120,
                           seed=17, parallel = FALSE)
 # unadjusted analysis========================:
 # Nonparametric estimation:
-res.un <- fit.nonpar(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+res.un <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
                      seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.un <- fit.cox(df=rhc, T="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200,
+res.cox.un <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
                       seed=17, parallel = FALSE)
 ```
 
@@ -1215,9 +1188,9 @@ Below we illustrate how to use `causalCmprsk` in survival data with only one tim
 ```{r}
 # nonparametric:
 # acm=all-cause mortality
-res.acm.30 <- fit.nonpar(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
+res.acm.30 <- fit.nonpar(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.acm.30 <- fit.cox(df=rhc_full, T="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=200, seed=17, parallel = FALSE)
+res.cox.acm.30 <- fit.cox(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
 ```
 
 

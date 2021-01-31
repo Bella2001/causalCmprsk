@@ -4,13 +4,13 @@
 \alias{get.numAtRisk}
 \title{Number-at-risk in raw and weighted data}
 \usage{
-get.numAtRisk(df, T, E, A, C = NULL, wtype = "unadj", cens = 0)
+get.numAtRisk(df, X, E, A, C = NULL, wtype = "unadj", cens = 0)
 }
 \arguments{
-\item{df}{a data frame that includes time-to-event \code{T}, type of event \code{E},
+\item{df}{a data frame that includes time-to-event \code{X}, type of event \code{E},
 a treatment indicator \code{A}  and covariates \code{C}.}
 
-\item{T}{a character string specifying the name of the time-to-event variable in \code{df}.}
+\item{X}{a character string specifying the name of the time-to-event variable in \code{df}.}
 
 \item{E}{a character string specifying the name of the "event type" variable in \code{df}.}
 
@@ -30,9 +30,9 @@ treatment selection bias and will not use propensity scores weighting. It can be
 in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 See Table 1 from Li, Morgan, and Zaslavsky (2018).
-"stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).}
+"stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).}
 
-\item{cens}{an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+\item{cens}{an integer value in \code{E} that corresponds to censoring times recorded in \code{X}.
 By default \code{fit.nonpar} assumes \code{cens}=0}
 }
 \value{
@@ -55,6 +55,51 @@ The estimated number-at-risk in the weighted sample corresponds to the rows with
 }
 \description{
 Obtaining time-varying number-at-risk statistic in both raw and weighted data
+}
+\examples{
+# create a data set
+n <- 1000
+set.seed(7)
+c1 <- runif(n)
+c2 <- as.numeric(runif(n)< 0.2)
+set.seed(77)
+cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+cf.m.E <- rep(0, n)
+cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+cf.m.E[cf.m.T2<cf.m.T1] <- 2
+set.seed(77)
+cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+cf.s.E <- rep(0, n)
+cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+cf.s.E[cf.s.T2<cf.s.T1] <- 2
+exp.z <- exp(0.5 + 1*c1 - 1*c2)
+pr <- exp.z/(1+exp.z)
+TRT <- ifelse(runif(n)< pr, 1, 0)
+X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+covs.names <- c("c1", "c2")
+data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+
+num.atrisk <- get.numAtRisk(data, "X", "E", "TRT", C=covs.names, wtype="overlap", cens=0)
+plot(num.atrisk$trt.1$time[num.atrisk$trt.1$sample=="Weighted"],
+     num.atrisk$trt.1$num[num.atrisk$trt.1$sample=="Weighted"], col="red", type="s",
+     xlab="time", ylab="number at risk",
+     main="Number at risk in TRT=1", ylim=c(0, max(num.atrisk$trt.1$num)))
+lines(num.atrisk$trt.1$time[num.atrisk$trt.1$sample=="Unadjusted"],
+      num.atrisk$trt.1$num[num.atrisk$trt.1$sample=="Unadjusted"], col="blue", type="s")
+legend("topright", legend=c("Weighted", "Unadjusted"), lty=1:1,  col=c("red", "blue"))
+plot(num.atrisk$trt.0$time[num.atrisk$trt.0$sample=="Weighted"],
+     num.atrisk$trt.0$num[num.atrisk$trt.0$sample=="Weighted"], col="red", type="s",
+     xlab="time", ylab="number at risk",
+     main="Number at risk in TRT=0", ylim=c(0, max(num.atrisk$trt.0$num)))
+lines(num.atrisk$trt.0$time[num.atrisk$trt.0$sample=="Unadjusted"],
+      num.atrisk$trt.0$num[num.atrisk$trt.0$sample=="Unadjusted"], col="blue", type="s")
+legend("topright", legend=c("Weighted", "Unadjusted"), lty=1:1,  col=c("red", "blue"))
+
 }
 \seealso{
 \code{\link{get.weights}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}

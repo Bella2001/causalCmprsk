@@ -48,6 +48,45 @@ For each type of event there is a list of estimates: \cr}
 Returns point estimates corresponding to a specific time point
 }
 \examples{
+# create a data set
+n <- 1000
+set.seed(7)
+c1 <-  runif(n)
+c2 <- as.numeric(runif(n)< 0.2)
+set.seed(77)
+cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+cf.m.E <- rep(0, n)
+cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+cf.m.E[cf.m.T2<cf.m.T1] <- 2
+set.seed(77)
+cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+cf.s.E <- rep(0, n)
+cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+cf.s.E[cf.s.T2<cf.s.T1] <- 2
+exp.z <- exp(0.5 + 1*c1 - 1*c2)
+pr <- exp.z/(1+exp.z)
+TRT <- ifelse(runif(n)< pr, 1, 0)
+X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+covs.names <- c("c1", "c2")
+data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+par(new=TRUE)
+hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+# Nonparametric estimation:
+res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+nonpar.pe <- get.pointEst(res.ATE, 0.5)
+nonpar.pe$trt.eff[[1]]$RD
+# Cox-based estimation:
+res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+cox.pe <- get.pointEst(res.cox.ATE, 0.5)
+cox.pe$trt.eff[[1]]$RD
+
 # please see our package vignette for practical examples
 
 }

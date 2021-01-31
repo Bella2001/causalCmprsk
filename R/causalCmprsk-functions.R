@@ -52,7 +52,7 @@
 #' that will estimate treatment effects in the raw (observed) data.
 #' @param wtype a character string variable indicating the type of weights that will define the target
 #' population for which the ATE will be estimated.
-#' The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+#' The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
 #' Other possible values are "ATE", "ATT", "ATC", and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
 #' @param case.w a vector of case weights.
@@ -66,10 +66,41 @@
 #'  using \code{stats::glm}} function
 #'
 #' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
-#' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#' @references M.A. Hernán, B. Brumback, and J.M. Robins. 2000. Marginal structural models and to estimate the causal effect of zidovudine on the survival of HIV-positive men. Epidemiology, 11 (5): 561-570.
 #'
 #' @seealso \code{\link{fit.nonpar}}, \code{\link{fit.cox}}, \code{\link{causalCmprsk}}
 #' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <- runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + 1*c1 - 1*c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse(runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+#' par(new=TRUE)
+#' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+#'
 #' # please see our package vignette for practical examples
 #'
 #' @export
@@ -113,9 +144,9 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
 #'
 #' Obtaining time-varying number-at-risk statistic in both raw and weighted data
 #'
-#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' @param df a data frame that includes time-to-event \code{X}, type of event \code{E},
 #' a treatment indicator \code{A}  and covariates \code{C}.
-#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param X a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
@@ -131,8 +162,8 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
 #' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 #' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{X}.
 #' By default \code{fit.nonpar} assumes \code{cens}=0
 #'
 #' @return  A list with two fields:
@@ -153,12 +184,54 @@ get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
 #' The estimated number-at-risk in the weighted sample corresponds to the rows with \code{sample="Weighted"}.}
 #'
 #' @seealso \code{\link{get.weights}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
+#' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <- runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + 1*c1 - 1*c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse(runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 #'
+#' num.atrisk <- get.numAtRisk(data, "X", "E", "TRT", C=covs.names, wtype="overlap", cens=0)
+#' plot(num.atrisk$trt.1$time[num.atrisk$trt.1$sample=="Weighted"],
+#'      num.atrisk$trt.1$num[num.atrisk$trt.1$sample=="Weighted"], col="red", type="s",
+#'      xlab="time", ylab="number at risk",
+#'      main="Number at risk in TRT=1", ylim=c(0, max(num.atrisk$trt.1$num)))
+#' lines(num.atrisk$trt.1$time[num.atrisk$trt.1$sample=="Unadjusted"],
+#'       num.atrisk$trt.1$num[num.atrisk$trt.1$sample=="Unadjusted"], col="blue", type="s")
+#' legend("topright", legend=c("Weighted", "Unadjusted"), lty=1:1,  col=c("red", "blue"))
+#' plot(num.atrisk$trt.0$time[num.atrisk$trt.0$sample=="Weighted"],
+#'      num.atrisk$trt.0$num[num.atrisk$trt.0$sample=="Weighted"], col="red", type="s",
+#'      xlab="time", ylab="number at risk",
+#'      main="Number at risk in TRT=0", ylim=c(0, max(num.atrisk$trt.0$num)))
+#' lines(num.atrisk$trt.0$time[num.atrisk$trt.0$sample=="Unadjusted"],
+#'       num.atrisk$trt.0$num[num.atrisk$trt.0$sample=="Unadjusted"], col="blue", type="s")
+#' legend("topright", legend=c("Weighted", "Unadjusted"), lty=1:1,  col=c("red", "blue"))
 #'
 #' @export
-get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
+get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 {
-  X <- df[[T]]
+  X <- df[[X]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
@@ -225,9 +298,9 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 } # end of .estimate.nonpar
 
 
-.sequential.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.sequential.fit.nonpar <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[T]]
+  X <- df[[X]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
@@ -340,8 +413,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT -
           bs.est.0[[paste("Ev=", k, sep="")]]$RMT
       }
-      #      if(i %% 25 == 0)
-      #        cat("We are on replication ",i," of ",nbs.rep," replications.\n")
       if (verbose) setTxtProgressBar(pb, i)
     }
     if (verbose) close(pb)
@@ -480,9 +551,9 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 
 
 
-.sequential.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.sequential.fit.cox <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[T]]
+  X <- df[[X]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
@@ -594,8 +665,6 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
         bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
           bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
       }
-      #     if (i %% 25 == 0)
-      #       cat("We are on replication ",i," of ",nbs.rep," replications.\n")
       if (verbose) setTxtProgressBar(pb, i)
     }
     if (verbose) close(pb)
@@ -752,6 +821,45 @@ get.numAtRisk <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0)
 #'
 #' @seealso \code{\link{fit.cox}}, \code{\link{fit.nonpar}}, \code{\link{causalCmprsk}}
 #' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <-  runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + 1*c1 - 1*c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse(runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+#' par(new=TRUE)
+#' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+#' # Nonparametric estimation:
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' nonpar.pe <- get.pointEst(res.ATE, 0.5)
+#' nonpar.pe$trt.eff[[1]]$RD
+#' # Cox-based estimation:
+#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' cox.pe <- get.pointEst(res.cox.ATE, 0.5)
+#' cox.pe$trt.eff[[1]]$RD
+#'
 #' # please see our package vignette for practical examples
 #'
 #' @export
@@ -759,12 +867,12 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 {
   if (class(cmprsk.obj)!="cmprsk")
   {
-    cat("Error. 'cmprsk.obj' is not of 'cmprsk' type.")
+    warning("Error. 'cmprsk.obj' is not of 'cmprsk' type.")
     return(NULL)
   }
   if (length(timepoint)>1)
   {
-    cat("Error. 'timepoint' is supposed to be a scalar.")
+    warning("Error. 'timepoint' is supposed to be a scalar.")
     return(NULL)
   }
   point.res <- list()
@@ -831,7 +939,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   return(point.res)
 }
 
-.nonpar.run <- function(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w)
+.nonpar.run <- function(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w)
 {
   if (wtype!="unadj")
   {
@@ -874,7 +982,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   res
 }
 
-.cox.run <- function(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w)
+.cox.run <- function(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs,case.w)
 {
   if (wtype!="unadj")
   {
@@ -916,9 +1024,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 }
 
 # Parallel Cox Fit
-.parallel.fit.cox <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.parallel.fit.cox <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[T]]
+  X <- df[[X]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
@@ -927,7 +1035,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   E.set <- E.set[E.set!=cens]
 
   #  res <- list(time=time)
-  res <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X, case.w = rep(1,nobs))
+  res <- .cox.run(df, X, E, A, C, wtype, cens, E.set,time, trt,nobs, case.w = rep(1,nobs))
   # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
   {
@@ -953,9 +1061,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
-        bs_aggregates <- .cox.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
-        #        if(i %% 25 == 0)
-        #         cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
+        bs_aggregates <- .cox.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
         if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates
       }
@@ -1088,9 +1194,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   }
 }
 
-.parallel.fit.nonpar <- function(df, T, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.parallel.fit.nonpar <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[T]]
+  X <- df[[X]]
   E <- df[[E]]
   nobs <- length(X)
   trt <- df[[A]]
@@ -1099,7 +1205,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   E.set <- E.set[E.set!=cens]
 
   #  res <- list(time=time) # this is the only place where I'll keep the time
-  res <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X, case.w = rep(1,nobs))
+  res <- .nonpar.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = rep(1,nobs))
 
   # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
@@ -1127,12 +1233,10 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
-        bs_aggregates <- .nonpar.run(df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w = bs.w)
+        bs_aggregates <- .nonpar.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
         if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
-    #        if(i %% 25 == 0)
-    #          cat(paste0('We are on replication ',i,' of ',nbs.rep,' replications.'),file= stdout())
     if (verbose) close(pb)
 
     for (k in E.set){
@@ -1271,9 +1375,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' Please see our package vignette for more details.
 #'
 #'
-#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' @param df a data frame that includes time-to-event \code{X}, type of event \code{E},
 #' a treatment indicator \code{A}  and covariates \code{C}.
-#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param X a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
@@ -1289,8 +1393,8 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 #' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{X}.
 #' By default \code{fit.nonpar} assumes \code{cens}=0
 #' @param conf.level the confidence level that will be used in the bootstrap confidence intervals.
 #' The default is 0.95
@@ -1337,15 +1441,51 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #'  between two treatment arms}
 #'
 #' @seealso \code{\link{fit.nonpar}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
+#'
 #' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <- runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + 1*c1 - 1*c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse(runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+#' par(new=TRUE)
+#' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+#' # Cox-based estimation:
+#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' cox.pe <- get.pointEst(res.cox.ATE, 0.5)
+#' cox.pe$trt.eff[[1]]$RD #-0.1894038
+#'
 #' # please see our package vignette for practical examples
 #'
-#' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
-#' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association, 113 (521): 390–400.
+#' @references M.A. Hernán, B. Brumback, and J.M. Robins. 2000. Marginal structural models and to estimate the causal effect of zidovudine on the survival of HIV-positive men. Epidemiology, 11 (5): 561-570.
 #'
 #'
 #' @export
-fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
+fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1354,7 +1494,7 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
   if(bs == TRUE && parallel == TRUE){
 
     # if windows (snow)
-    if(grepl('win',get_os(),ignore.case = T)) {
+    if(grepl('win',get_os(),ignore.case = TRUE)) {
       #      num_cores <- round(parallel::detectCores()/2,digits = 0)
       num_cores <- 2
       cluster <- parallel::makeCluster(num_cores)
@@ -1362,16 +1502,16 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
     }
 
     # if unix (multicore)
-    if(grepl('unix|linux',get_os(),ignore.case = T)){
+    if(grepl('unix|linux',get_os(),ignore.case = TRUE)){
       num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
       cluster <- parallel::makeCluster(num_cores)
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    .parallel.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    .parallel.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
   }
   else
-    .sequential.fit.cox(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    .sequential.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
 
 }
 
@@ -1388,9 +1528,9 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' Please see our package vignette for more details.
 #'
 #'
-#' @param df a data frame that includes time-to-event \code{T}, type of event \code{E},
+#' @param df a data frame that includes time-to-event \code{X}, type of event \code{E},
 #' a treatment indicator \code{A}  and covariates \code{C}.
-#' @param T a character string specifying the name of the time-to-event variable in \code{df}.
+#' @param X a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
@@ -1406,8 +1546,8 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 #' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
-#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
-#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{T}.
+#' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
+#' @param cens an integer value in \code{E} that corresponds to censoring times recorded in \code{X}.
 #' By default \code{fit.nonpar} assumes \code{cens}=0
 #' @param conf.level the confidence level that will be used in the bootstrap confidence intervals.
 #' The default is 0.95
@@ -1454,14 +1594,50 @@ fit.cox <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #'  between two treatment arms}
 #'
 #' @seealso \code{\link{fit.cox}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
+#'
 #' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <-  runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + 1*c1 - 1*c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse(runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+#' par(new=TRUE)
+#' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+#' # Nonparametric estimation:
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' nonpar.pe <- get.pointEst(res.ATE, 0.5)
+#' nonpar.pe$trt.eff[[1]]$RD # -0.1776143
+#'
 #' # please see our package vignette for practical examples
 #'
 #' @references F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
-#' @references M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+#' @references M.A. Hernán, B. Brumback, and J.M. Robins. 2000. Marginal structural models and to estimate the causal effect of zidovudine on the survival of HIV-positive men. Epidemiology, 11 (5): 561-570.
 #'
 #' @export
-fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
+fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
@@ -1470,7 +1646,7 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
   if(bs == TRUE && parallel == TRUE){
 
     # if windows (snow)
-    if(grepl('win',get_os(),ignore.case = T)) {
+    if(grepl('win',get_os(),ignore.case = TRUE)) {
 #      num_cores <- round(parallel::detectCores()/2,digits = 0)
       num_cores <- 2
       cluster <- parallel::makeCluster(num_cores)
@@ -1478,16 +1654,16 @@ fit.nonpar <- function(df, T, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
     }
 
     # if unix (multicore)
-    if(grepl('unix|linux',get_os(),ignore.case = T)){
+    if(grepl('unix|linux',get_os(),ignore.case = TRUE)){
       num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
       cluster <- parallel::makeCluster(num_cores)
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    .parallel.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    .parallel.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
   }
   else
-    .sequential.fit.nonpar(df = df, T = T, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    .sequential.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
 
 }
 

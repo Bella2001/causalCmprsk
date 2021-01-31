@@ -20,7 +20,7 @@ that will estimate treatment effects in the raw (observed) data.}
 
 \item{wtype}{a character string variable indicating the type of weights that will define the target
 population for which the ATE will be estimated.
-The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernan et al. (2000).
+The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
 Other possible values are "ATE", "ATT", "ATC", and "overlap".
 See Table 1 from Li, Morgan, and Zaslavsky (2018).}
 
@@ -41,13 +41,44 @@ and requested weights. The estimated propensity scores can be used
 for further diagnostics, e.g. for testing a positivity assumption and covariate balance.
 }
 \examples{
+# create a data set
+n <- 1000
+set.seed(7)
+c1 <- runif(n)
+c2 <- as.numeric(runif(n)< 0.2)
+set.seed(77)
+cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+cf.m.E <- rep(0, n)
+cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+cf.m.E[cf.m.T2<cf.m.T1] <- 2
+set.seed(77)
+cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+cf.s.E <- rep(0, n)
+cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+cf.s.E[cf.s.T2<cf.s.T1] <- 2
+exp.z <- exp(0.5 + 1*c1 - 1*c2)
+pr <- exp.z/(1+exp.z)
+TRT <- ifelse(runif(n)< pr, 1, 0)
+X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+covs.names <- c("c1", "c2")
+data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
+par(new=TRUE)
+hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
+
 # please see our package vignette for practical examples
 
 }
 \references{
 F. Li, K.L. Morgan, and A.M. Zaslavsky. 2018. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
 
-M. Hernan, K.L. Morgan, and A.M. Zaslavsky. 2000. Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association 113 (521): 390–400.
+M.A. Hernán, B. Brumback, and J.M. Robins. 2000. Marginal structural models and to estimate the causal effect of zidovudine on the survival of HIV-positive men. Epidemiology, 11 (5): 561-570.
 }
 \seealso{
 \code{\link{fit.nonpar}}, \code{\link{fit.cox}}, \code{\link{causalCmprsk}}
