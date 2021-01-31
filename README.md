@@ -8,7 +8,7 @@ The  `causalCmprsk` package can be installed by
 ```{r}
 devtools::install_github("Bella2001/causalCmprsk")
 ```
-The examples of how to use `causalCmprsk` package are [here]( https://htmlpreview.github.io/?https://github.com/Bella2001/causalCmprsk/blob/dev/index.html.
+The examples of how to use `causalCmprsk` package are [here]( https://htmlpreview.github.io/?https://github.com/Bella2001/causalCmprsk/blob/dev/index.html).
  
  
  
