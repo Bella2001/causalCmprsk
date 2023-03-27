@@ -1953,8 +1953,7 @@ fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 #' # Nonparametric estimation:
-#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE",
-#'  bs=TRUE, nbs.rep=40, seed=1, parallel = FALSE) # in practice, nbs.rep should be much larger
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
 #' # summarizing results on the Risk Difference for event=2
 #' fit.summary <- summary(object=res.ATE, event = 2, estimand="RD")
 #' head(fit.summary)
@@ -1968,6 +1967,51 @@ fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
 summary.cmprsk <- function(object, event, estimand="CIF", ...)
 {
   # S3 method for class 'cmprsk'
+  if (length(object$trt.0[[paste("Ev=", 1, sep="")]]) == 3)
+  {
+    if (estimand %in% c("CumHaz", "CIF", "RMT"))
+    {
+      df <- rbind( data.frame(time=object$time, TRT=1, Event=event,
+                              CIF=object$trt.1[[paste("Ev=", event, sep="")]]$CIF,
+                              RMT=object$trt.1[[paste("Ev=", event, sep="")]]$RMT,
+                              CumHaz=object$trt.1[[paste("Ev=", event, sep="")]]$CumHaz
+      ),
+      data.frame(time=object$time, TRT=0, Event=event,
+                 CIF=object$trt.0[[paste("Ev=", event, sep="")]]$CIF,
+                 RMT=object$trt.0[[paste("Ev=", event, sep="")]]$RMT,
+                 CumHaz=object$trt.0[[paste("Ev=", event, sep="")]]$CumHaz)
+      )
+      if (estimand=="CumHaz")
+        df <- df[, c("time", "TRT", "Event", "CumHaz")]
+      if (estimand=="CIF")
+        df <- df[, c("time", "TRT", "Event", "CIF")]
+      if (estimand=="RMT")
+        df <- df[, c("time", "TRT", "Event", "RMT")]
+    }
+    else if (estimand %in% c("logHR", "RD", "RR", "ATE.RMT"))
+    {
+
+      df <- data.frame(time=object$time, Event=event,
+                       logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR,
+                       RD=object$trt.eff[[paste("Ev=", event, sep="")]]$RD,
+                       RR=object$trt.eff[[paste("Ev=", event, sep="")]]$RR,
+                       ATE.RMT=object$trt.eff[[paste("Ev=", event, sep="")]]$ATE.RMT
+      )
+      if (estimand=="logHR")
+        df <- df[, c("time", "Event", "logCumHazR")]
+      if (estimand=="RD")
+        df <- df[, c("time", "Event", "RD")]
+      if (estimand=="RR")
+        df <- df[, c("time", "Event", "RR")]
+      if (estimand=="ATE.RMT")
+        df <- df[, c("time", "Event", "ATE.RMT")]
+    }
+    else # error message
+    {
+      stop("'estimand' is not one of the following: c('CumHaz', 'CIF', 'RMT', 'logHR', 'RD', 'RR', 'ATE.RMT'). \n")
+    }
+  } else
+  {
   if (estimand %in% c("CumHaz", "CIF", "RMT"))
   {
     df <- rbind( data.frame(time=object$time, TRT=1, Event=event,
@@ -2005,7 +2049,8 @@ summary.cmprsk <- function(object, event, estimand="CIF", ...)
     if (estimand=="RMT")
       df <- df[, c("time", "TRT", "Event", "RMT", "CIL.RMT", "CIU.RMT", "SE.RMT")]
   }
-  else if (estimand %in% c("logHR", "RD", "RR", "ATE.RMT"))
+  else
+    if (estimand %in% c("logHR", "RD", "RR", "ATE.RMT"))
   {
     df <- data.frame(time=object$time, Event=event,
                      logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR,
@@ -2036,6 +2081,7 @@ summary.cmprsk <- function(object, event, estimand="CIF", ...)
   else # error message
   {
     stop("'estimand' is not one of the following: c('CumHaz', 'CIF', 'RMT', 'logHR', 'RD', 'RR', 'ATE.RMT'). \n")
+  }
   }
   return(df)
 }
