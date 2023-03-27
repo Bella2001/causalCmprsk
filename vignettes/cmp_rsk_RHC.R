@@ -1,47 +1,51 @@
-## ----label= fig1, fig.cap="A single-world competing risks model with two events *discharge* and *in-hospital death*.", echo=FALSE, fig.align="center", out.width = "60%"----
-    knitr::include_graphics('RHC_cmp_rsk.png')
+## -----------------------------------------------------------------------------
+pckgs <- c("knitr", "tidyverse", "ggalt", "cobalt", "ggsci",
+    "modEvA", "naniar", "DT", "Hmisc", "hrbrthemes", "summarytools", 
+     "survival", "causalCmprsk") # "kableExtra",
+
+
+## ----cran_packages0, echo=TRUE, include=TRUE, message=FALSE, warning=FALSE----
+ix=NULL
+for (package in pckgs)
+  if (!requireNamespace(package, quietly = TRUE)) ix <- c(ix, package)
+if (length(ix)!=0)
+{
+pr <- "WARNING: Packages: "
+for (i in ix) 
+  pr <- paste(pr, i, sep="")
+pr <- paste(pr, "\nhave to be installed in order to successfully compile the rest of the vignette. Please install these packages and compile again.", sep="")
+cat(pr)
+knitr::knit_exit()
+}
 
 ## ----cran_packages, echo=TRUE, include=TRUE, message=FALSE, warning=FALSE-----
-library(survival)
-library(tidyverse)
-library(ggalt) # for stepribbon
-library(cobalt)
-library(ggsci) # Nature Color palette
-library(modEvA) # for H-L GOF test
-library(naniar) # for exploring missingness 
-library(knitr)
-library(kableExtra)
-library(summarytools)  
-library(DT) 
-library(Hmisc)
-
-library(causalCmprsk)
+for (package in pckgs)
+  library(package, character.only=TRUE) 
 
 opts_chunk$set(results = 'asis',      # Can also be set at the chunk-level
-                comment = NA,
-                prompt  = FALSE,
-                cache   = FALSE)
-st_options(plain.ascii = FALSE,        # Always use this option in Rmd documents
+                 comment = NA,
+                 prompt  = FALSE,
+                 cache   = FALSE)
+summarytools::st_options(plain.ascii = FALSE,        # Always use this option in Rmd documents
           style        = "rmarkdown",  # Always use this option in Rmd documents
           footnote     = NA,           # Makes html-rendered results more concise
           subtitle.emphasis = FALSE)   # Improves layout with some rmardown themes
 
 ## ----code1, echo=TRUE---------------------------------------------------------
-getHdata(rhc) # loading data using the Hmisc package
+Hmisc::getHdata(rhc) # loading data using the Hmisc package
 rhc_raw <- rhc
 
 ## -----------------------------------------------------------------------------
 miss.report <- rhc_raw %>% miss_var_summary()
-kable(miss.report[1:10,]) %>%
- kable_styling(bootstrap_options = "striped", full_width = F)
+kable(miss.report[1:10,]) # %>% kable_styling(bootstrap_options = "striped", full_width = F)
 
 ## -----------------------------------------------------------------------------
 rhc_cleaning1 <- rhc_raw %>%
   mutate(RHC = as.numeric(swang1 == "RHC"), 
          trt=swang1,
          E = ifelse(is.na(dthdte), 1, ifelse(dschdte==dthdte, 2, 1)), 
-         T = dschdte - sadmdte,
-         T.death = ifelse(is.na(dthdte), lstctdte - sadmdte, dthdte - sadmdte), # censored time to death
+         Time = dschdte - sadmdte, #=time-to-"Discharge" (either alive or due to death in a hospital)
+         T.death = ifelse(is.na(dthdte), lstctdte - sadmdte, dthdte - sadmdte), #=min(Time to death before or after discharge, Time to a last follow-up visit)
          D = ifelse(death =="No", 0, 1), # death indicator
          sex_Male = as.numeric(sex == "Male"),
          race_black = as.numeric(race == "black"),
@@ -80,7 +84,7 @@ rhc_cleaning1 <- rhc_raw %>%
 
 # variables selection and data reordering:
 rhc_full <- rhc_cleaning1 %>% 
-  select(ptid, RHC, trt, T, T.death, E, D, sex_Male, 
+  select(ptid, RHC, trt, Time, T.death, E, D, sex_Male, 
          age, edu, race_black, race_other, income_11_25K, income_25_50K, income_50K,
          ninsclas_Private_Medicare, ninsclas_Medicare, ninsclas_Medicare_Medicaid,
          ninsclas_Medicaid, ninsclas_No_Insurance, 
@@ -105,29 +109,29 @@ rhc_full <- rhc_cleaning1 %>%
 # omit 1 obs with missing discharge date for the length-of-stay analysis:
 rhc <- rhc_full[!is.na(rhc_raw$dschdte),]
 rhc_full$T.death.30 <- pmin(30, rhc_full$T.death)
-rhc_full$D.30 <- ifelse(rhc_full$T.death <=30, 1, 0)
+rhc_full$D.30 <- rhc_full$D*ifelse(rhc_full$T.death <=30, 1, 0)
 
 ## ---- echo=TRUE---------------------------------------------------------------
 E <- as.factor(rhc$E)
 levels(E) <- c("discharge", "in-hospital death")
 t <- addmargins(table(E, useNA="no"))
-kable(t) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+kable(t) # %>% kable_styling(bootstrap_options = "striped", full_width = F)
 
 ## ---- echo=TRUE---------------------------------------------------------------
 D <- as.factor(rhc_full$D)
 levels(D) <- c("censored", "died")
 t <- addmargins(table(D, useNA="no"))
-kable(t) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+kable(t) # %>% kable_styling(bootstrap_options = "striped", full_width = F)
 
 ## ---- echo=TRUE---------------------------------------------------------------
 D.30 <- as.factor(rhc_full$D.30)
 levels(D.30) <- c("censored", "died")
 t <- addmargins(table(D.30, useNA="no"))
-kable(t) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+kable(t) #%>% kable_styling(bootstrap_options = "striped", full_width = F)
 
 ## ---- echo=TRUE---------------------------------------------------------------
 t <- addmargins(table(rhc_full$trt, useNA="no"))
-kable(t) %>% kable_styling(bootstrap_options = "striped", full_width = F)
+kable(t) #%>% kable_styling(bootstrap_options = "striped", full_width = F)
 
 ## -----------------------------------------------------------------------------
 covs.names <- c("age", "sex_Male", "edu", "race_black", "race_other",
@@ -245,13 +249,13 @@ df3 <- data.frame(cbind(descr.orig, descr.ATE, descr.overlap))
 row.names(df3) <- covs.names
 names(df3) <- rep( c("mean", "sd", "q1", "med", "q3"), times=3)
 
-kable(df3, caption="Comparing marginal distributions of covariates for three populations. q1, med and q3 correspond to 1st, 2nd and 3rd quartiles of a distribution.") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = FALSE) %>%
-   add_header_above(c("covariate "= 1, "original population" = 5, "stab.ATE population" = 5, "overlap population"=5)) %>%
-  column_spec(2, background = "lightgrey") %>%
-  column_spec(7, background = "lightgrey") %>%
-  column_spec(12, background = "lightgrey") %>%  
-     scroll_box(width = "100%", height = "500px")
+kable(df3, caption="Comparing marginal distributions of covariates for three populations. q1, med and q3 correspond to 1st, 2nd and 3rd quartiles of covariates distributions for: (1) the original  population; (2) stab.ATE population; (3) overlap population.") 
+#%>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = FALSE) %>%
+#   add_header_above(c("covariate "= 1, "original population" = 5, "stab.ATE population" = 5, "overlap population"=5)) %>%
+ # column_spec(2, background = "lightgrey") %>%
+#  column_spec(7, background = "lightgrey") %>%
+#  column_spec(12, background = "lightgrey") %>%  
+ #    scroll_box(width = "100%", height = "500px")
 
 ## ----label=ATEwdistr, fig.height=5, fig.width=5, fig.align="center" ,  message=FALSE, warning=FALSE, fig.cap="Distribution of stab.ATE weights."----
 ggplot(rhc.ps, aes(x = stab.ATE.w, fill = trt, color=trt)) +  
@@ -270,28 +274,29 @@ ggplot(rhc.ps, aes(x = overlap.w, fill = trt, color=trt)) +
 ## -----------------------------------------------------------------------------
 # overlap weights========================:
 # Nonparametric estimation:
-res.overlap <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE) # The small number of bootstrap replications (nbs.rep=80) was chosen for illustration purposes.  
+res.overlap <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50, seed=17, parallel = FALSE) # The small number of bootstrap replications (nbs.rep=80) was chosen for illustration purposes.  
 # Cox-based estimation:
-res.cox.overlap <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
+res.cox.overlap <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50, seed=17, parallel = FALSE)
+
 # stab.ATE weights==========================:
 # Nonparametric estimation:
-res.stab.ATE <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
+res.stab.ATE <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                           seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.stab.ATE <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=120,
+res.cox.stab.ATE <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                           seed=17, parallel = FALSE)
 # unadjusted analysis========================:
 # Nonparametric estimation:
-res.un <- fit.nonpar(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
+res.un <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                      seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.un <- fit.cox(df=rhc, X="T", E="E", A="RHC", C=covs.names, 
-                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
+res.cox.un <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+                          wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                       seed=17, parallel = FALSE)
 
 ## ----echo=TRUE, message=FALSE, warning=FALSE----------------------------------
@@ -418,295 +423,191 @@ plot.CumHaz(df=df.CumHaz[[1]][df.CumHaz[[1]]$TRT==0,], title="No-RHC: CumHaz of 
 plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==1,], title="RHC: CumHaz of Death", ymax=2.5)
 plot.CumHaz(df=df.CumHaz[[2]][df.CumHaz[[2]]$TRT==0,], title="No-RHC: CumHaz of Death", ymax=2.5)
 
-## ----echo=TRUE, fig.align="center",  message=FALSE, warning=FALSE-------------
-get.CIF.RMT <- function(res)
-{
-  df.CIF.RMT <- rbind( data.frame(time=res$time, Event_TRT=1,
-                        CIF=res$trt.1[[paste("Ev=", 1, sep="")]]$CIF, 
-                        RMT=res$trt.1[[paste("Ev=", 1, sep="")]]$RMT,
-                        CumHaz=res$trt.1[[paste("Ev=", 1, sep="")]]$CumHaz,
-                        CIL.CIF=res$trt.1[[paste("Ev=", 1, sep="")]]$CIF.CI.L,
-                        CIU.CIF=res$trt.1[[paste("Ev=", 1, sep="")]]$CIF.CI.U,
-                        CIL.RMT=res$trt.1[[paste("Ev=", 1, sep="")]]$RMT.CI.L,
-                        CIU.RMT=res$trt.1[[paste("Ev=", 1, sep="")]]$RMT.CI.U,
-                        CIL.CumHaz=res$trt.1[[paste("Ev=", 1, sep="")]]$CumHaz.CI.L,
-                        CIU.CumHaz=res$trt.1[[paste("Ev=", 1, sep="")]]$CumHaz.CI.U),
-            data.frame(time=res$time, Event_TRT=2,
-                       CIF=res$trt.0[[paste("Ev=", 1, sep="")]]$CIF, 
-                       RMT=res$trt.0[[paste("Ev=", 1, sep="")]]$RMT,
-                       CumHaz=res$trt.0[[paste("Ev=", 1, sep="")]]$CumHaz,
-                      CIL.CIF=res$trt.0[[paste("Ev=", 1, sep="")]]$CIF.CI.L,
-                      CIU.CIF=res$trt.0[[paste("Ev=", 1, sep="")]]$CIF.CI.U,
-                      CIL.RMT=res$trt.0[[paste("Ev=", 1, sep="")]]$RMT.CI.L,
-                      CIU.RMT=res$trt.0[[paste("Ev=", 1, sep="")]]$RMT.CI.U,
-                      CIL.CumHaz=res$trt.0[[paste("Ev=", 1, sep="")]]$CumHaz.CI.L,
-                      CIU.CumHaz=res$trt.0[[paste("Ev=", 1, sep="")]]$CumHaz.CI.U),
-             data.frame(time=res$time, Event_TRT=3,
-                        CIF=res$trt.1[[paste("Ev=", 2, sep="")]]$CIF, 
-                        RMT=res$trt.1[[paste("Ev=", 2, sep="")]]$RMT,
-                        CumHaz=res$trt.1[[paste("Ev=", 2, sep="")]]$CumHaz,
-                        CIL.CIF=res$trt.1[[paste("Ev=", 2, sep="")]]$CIF.CI.L,
-                        CIU.CIF=res$trt.1[[paste("Ev=", 2, sep="")]]$CIF.CI.U,
-                        CIL.RMT=res$trt.1[[paste("Ev=", 2, sep="")]]$RMT.CI.L,
-                        CIU.RMT=res$trt.1[[paste("Ev=", 2, sep="")]]$RMT.CI.U,
-                        CIL.CumHaz=res$trt.1[[paste("Ev=", 2, sep="")]]$CumHaz.CI.L,
-                        CIU.CumHaz=res$trt.1[[paste("Ev=", 2, sep="")]]$CumHaz.CI.U),
-            data.frame(time=res$time,  Event_TRT=4,
-                       CIF=res$trt.0[[paste("Ev=", 2, sep="")]]$CIF,
-                       RMT=res$trt.0[[paste("Ev=", 2, sep="")]]$RMT,
-                       CumHaz=res$trt.0[[paste("Ev=", 2, sep="")]]$CumHaz,
-                      CIL.CIF=res$trt.0[[paste("Ev=", 2, sep="")]]$CIF.CI.L,
-                      CIU.CIF=res$trt.0[[paste("Ev=", 2, sep="")]]$CIF.CI.U,
-                      CIL.RMT=res$trt.0[[paste("Ev=", 2, sep="")]]$RMT.CI.L,
-                      CIU.RMT=res$trt.0[[paste("Ev=", 2, sep="")]]$RMT.CI.U,
-                      CIL.CumHaz=res$trt.0[[paste("Ev=", 2, sep="")]]$CumHaz.CI.L,
-                      CIU.CumHaz=res$trt.0[[paste("Ev=", 2, sep="")]]$CumHaz.CI.U)
-            )
-  df.CIF.RMT$Event_TRT <- factor(df.CIF.RMT$Event_TRT)
-  levels(df.CIF.RMT$Event_TRT) <- c("Discharge-RHC", "Discharge-No RHC", "In-hospital death-RHC", "In-hospital death-No RHC")
-  return(df.CIF.RMT)
-}
-
-df.CIF.RMT <- get.CIF.RMT(res.overlap)
-pest.overlap.30 <- get.pointEst(res.overlap, 30) 
-pest.overlap.100 <- get.pointEst(res.overlap, 100) 
-
 ## ----label=CumHaz4, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Cause-specific cumulative hazards.", fig.show='hold'----
-p <- ggplot(df.CIF.RMT, aes(x=time, y=CumHaz, color=Event_TRT, fill=Event_TRT, shape=Event_TRT)) +
-  geom_step(size=1.1) + #ggtitle("Cumulative hazards") + 
-    geom_ribbon(aes(ymin=CIL.CumHaz, ymax=CIU.CumHaz), alpha=0.2, stat="stepribbon") +
-   scale_fill_npg() + scale_color_npg() #+xlim(0, 150)
-p <- p +  geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + ylab("Cumulative hazard of event by time t") +
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.3, 0.8),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
+df <- rbind(summary(res.stab.ATE, event=1, estimand="CumHaz"),
+            summary(res.stab.ATE, event=2, estimand="CumHaz"))
+df$Event_TRT <- factor(2*(df$Event==2) + 1*(df$TRT==0))
+levels(df$Event_TRT) <- c("Discharge-RHC", "Discharge-No RHC",
+                          "In-hospital death-RHC", "In-hospital death-No RHC")
 
-## ----label=Risk4, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Cause-specific risk curves", fig.show='hold'----
-p <- ggplot(df.CIF.RMT, aes(x=time, y=CIF, color=Event_TRT, fill=Event_TRT, shape=Event_TRT)) +
-  geom_step(size=1.1) + #ggtitle("Risk curves") + 
-      geom_ribbon(aes(ymin=CIL.CIF, ymax=CIU.CIF), alpha=0.2, stat="stepribbon") +
-   scale_fill_npg() + scale_color_npg() +xlim(0, 150)
-p <- p +  geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + ylab("Probability of event by time t") +
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.7, 0.25),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
+ggplot(df, aes(x=time, y=CumHaz, color=Event_TRT, fill=Event_TRT,
+               shape=Event_TRT, linetype=Event_TRT)) + geom_step(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.CumHaz, ymax=CIU.CumHaz), alpha=0.2,
+              stat="stepribbon") + scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlab("time from admission to ICU (days)") +
+  ylab("Cumulative hazard of event by time t") +
+  theme(legend.position = c(0.41, 0.83), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
+
+
+## ----label=Risk4, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Risk curves", fig.show='hold'----
+df <- rbind(summary(res.stab.ATE, event=1, estimand="CIF"),
+            summary(res.stab.ATE, event=2, estimand="CIF"))
+df$Event_TRT <- factor(2*(df$Event==2) + 1*(df$TRT==0))
+levels(df$Event_TRT) <- c("Discharge-RHC", "Discharge-No RHC",
+                          "In-hospital death-RHC", "In-hospital death-No RHC")
+
+ggplot(df, aes(x=time, y=CIF, color=Event_TRT, fill=Event_TRT,
+               shape=Event_TRT, linetype=Event_TRT)) + geom_step(linewidth=1.1) + xlim(0, 200) +
+  geom_ribbon(aes(ymin=CIL.CIF, ymax=CIU.CIF), alpha=0.2,
+              stat="stepribbon") + scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlab("time from admission to ICU (days)") +
+  ylab("Probability of event by time t") +
+  theme(legend.position = c(0.7, 0.25), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
 
 ## ----label=RMT4, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5, message=FALSE, warning=FALSE, fig.cap="Restricted-mean-time-lost/gained due to specific event.", fig.show='hold'----
-p <- ggplot(df.CIF.RMT, aes(x=time, y=RMT, color=Event_TRT, 
-                            fill=Event_TRT, shape=Event_TRT)) +
-  geom_line(size=1.1) + #ggtitle("Restricted-mean-time-lost/gained due to specific event") +  
-  geom_ribbon(aes(ymin=CIL.RMT, ymax=CIU.RMT), alpha=0.2) + #, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
- p <- p +  geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + ylab("average time lost due to death (gained by recovery)") + 
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.3, 0.8),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
+df <- rbind(summary(res.stab.ATE, event=1, estimand="RMT"),
+            summary(res.stab.ATE, event=2, estimand="RMT"))
+df$Event_TRT <- factor(2*(df$Event==2) + 1*(df$TRT==0))
+levels(df$Event_TRT) <- c("Discharge-RHC", "Discharge-No RHC",
+                          "In-hospital death-RHC", "In-hospital death-No RHC")
 
-## ----echo=TRUE, fig.align="center",  message=FALSE, warning=FALSE-------------
-get.RD.RMT <- function(res)
-{
-  df <- rbind( data.frame(time=res$time, Outcome=1,
-                      RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD, 
-                      CIL.RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD.CI.L, 
-                      CIU.RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD.CI.U,
-                      ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT, 
-                      CIL.ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT.CI.L, 
-                      CIU.ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT.CI.U),
-            data.frame(time=res$time, Outcome=2,
-                      RD=res$trt.eff[[paste("Ev=", 2, sep="")]]$RD, 
-                      CIL.RD=res$trt.eff[[paste("Ev=", 2, sep="")]]$RD.CI.L, 
-                      CIU.RD=res$trt.eff[[paste("Ev=", 2, sep="")]]$RD.CI.U,
-                      ATE.RMT=res$trt.eff[[paste("Ev=", 2, sep="")]]$ATE.RMT, 
-                      CIL.ATE.RMT=res$trt.eff[[paste("Ev=", 2, sep="")]]$ATE.RMT.CI.L, 
-                      CIU.ATE.RMT=res$trt.eff[[paste("Ev=", 2, sep="")]]$ATE.RMT.CI.U))
-  
-  df$Outcome <- factor(df$Outcome)
-  levels(df$Outcome) <- c("Discharge", "In-hospital death")
-  return(df)
-}
-df.RD.RMT <- get.RD.RMT(res.overlap)
+ggplot(df, aes(x=time, y=RMT, color=Event_TRT, fill=Event_TRT,
+               shape=Event_TRT, linetype=Event_TRT)) + geom_line(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.RMT, ymax=CIU.RMT), alpha=0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlab("time from admission to ICU (days)") +
+  ylab("average time lost due to death (gained by recovery)") +
+  theme(legend.position = c(0.35, 0.8), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
 
 ## ----label=fig16, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,   message=FALSE, warning=FALSE, fig.cap="Risk differences for discharge and in-hospital death.", fig.show='hold'----
-p <- ggplot(df.RD.RMT, aes(x=time, y=RD, color=Outcome, 
-                            fill=Outcome, shape=Outcome)) +
-  geom_step(size=1.1) + #ggtitle("Risk differences for discharge and in-hospital death") + 
-    geom_ribbon(aes(ymin=CIL.RD, ymax=CIU.RD), alpha=0.2, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
-p <- p +  geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + 
-  ylab("Risk difference") + xlim(0, 150) +
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.8, 0.5),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
+df <- rbind(summary(res.stab.ATE, event=1, estimand="RD"),
+            summary(res.stab.ATE, event=2, estimand="RD"))
+df$Event <- as.factor(df$Event)
+levels(df$Event) <- c("Discharge", "In-hospital death")
+
+ggplot(df, aes(x=time, y=RD, color=Event, fill=Event,
+               shape=Event, linetype=Event)) + geom_step(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.RD, ymax=CIU.RD), alpha=0.2,
+              stat="stepribbon") + scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlab("time from admission to ICU (days)") +
+  ylab("Risk difference") + xlim(0, 200) +
+  theme(legend.position = c(0.7, 0.6), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
 
 ## ----echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Difference in average time lost/gained due to treatment.", fig.show='hold'----
-p <- ggplot(df.RD.RMT, aes(x=time, y=ATE.RMT, color=Outcome, 
-                            fill=Outcome, shape=Outcome)) +
-  geom_line(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
-    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) + #, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
-p <- p +  geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + 
-  ylab("time (days)") + 
+df <- rbind(summary(res.stab.ATE, event=1, estimand="ATE.RMT"),
+            summary(res.stab.ATE, event=2, estimand="ATE.RMT"))
+df$Event <- as.factor(df$Event)
+levels(df$Event) <- c("Discharge", "In-hospital death")
+
+ggplot(df, aes(x=time, y=ATE.RMT, color=Event, fill=Event,
+               shape=Event, linetype=Event)) + geom_line(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlab("time from admission to ICU (days)") +
+  ylab("average time (days) lost/gained due to treatment") +
+  theme(legend.position = c(0.7, 0.5), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
+
+## ----echo=TRUE, fig.align="center",  fig.width=5, fig.height=5, message=FALSE, warning=FALSE, fig.cap="Cumulative distribution of length-of-stay in RHC vs No-RHC groups."----
+alpha=0.05
+# trt.0:
+bs.CumPr.0 <- 1-exp(-res.stab.ATE$trt.0[[paste("Ev=", 1, sep="")]]$bs.CumHaz -
+                      res.stab.ATE$trt.0[[paste("Ev=", 2, sep="")]]$bs.CumHaz)
+CumPr.CIL.0 <- apply(bs.CumPr.0, 2, quantile, prob=alpha/2, na.rm=TRUE)
+CumPr.CIU.0 <- apply(bs.CumPr.0, 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+# trt.1:
+bs.CumPr.1 <- 1-exp(-res.stab.ATE$trt.1[[paste("Ev=", 1, sep="")]]$bs.CumHaz -
+                      res.stab.ATE$trt.1[[paste("Ev=", 2, sep="")]]$bs.CumHaz)
+CumPr.CIL.1 <- apply(bs.CumPr.1, 2, quantile, prob=alpha/2, na.rm=TRUE)
+CumPr.CIU.1 <- apply(bs.CumPr.1, 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+
+df <- rbind(data.frame(time=res.stab.ATE$time, TRT=1,
+                       CumPr=1-exp(-res.stab.ATE$trt.1[[paste("Ev=", 1, sep="")]]$CumHaz -
+                             res.stab.ATE$trt.1[[paste("Ev=", 2, sep="")]]$CumHaz),
+                       CumPr.CIL=CumPr.CIL.1, CumPr.CIU=CumPr.CIU.1),
+            data.frame(time=res.stab.ATE$time, TRT=2,
+                       CumPr=1-exp(-res.stab.ATE$trt.0[[paste("Ev=", 1, sep="")]]$CumHaz -
+                             res.stab.ATE$trt.0[[paste("Ev=", 2, sep="")]]$CumHaz),
+                       CumPr.CIL=CumPr.CIL.0, CumPr.CIU=CumPr.CIU.0))
+df$TRT <- as.factor(df$TRT)
+levels(df$TRT) <- c("RHC", "No-RHC")
+
+ggplot(df, aes(x=time, y=CumPr, color=TRT, fill=TRT, shape=TRT)) +
+  geom_step(linewidth=1.1) + scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") + xlim(0,100) +
+  xlab("time (days)") + ylab("Cumulative distribution of length-of-stay") +
+  geom_ribbon(aes(ymin=CumPr.CIL, ymax=CumPr.CIU), alpha=0.2, stat="stepribbon")+
   theme(axis.text.x = element_text(face="bold", angle=45),
         axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.8, 0.5),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
-
-## -----------------------------------------------------------------------------
-get.cumPr <- function(res) # 1-KM(t)
-{
-  df <- rbind( data.frame(time=res$time, TRT=1,
-                          CumPr=1-exp(-res$trt.1[[paste("Ev=", 1, sep="")]]$CumHaz - 
-                                   res$trt.1[[paste("Ev=", 2, sep="")]]$CumHaz) ),
-               data.frame(time=res$time, TRT=2, 
-                          CumPr=1-exp(-res$trt.0[[paste("Ev=", 1, sep="")]]$CumHaz - 
-                                   res$trt.0[[paste("Ev=", 2, sep="")]]$CumHaz))
-  )
-  df$TRT <- factor(df$TRT)
-  levels(df$TRT) <- c("RHC", "No-RHC")
-  df
-}
-df.cumPr <- get.cumPr(res.overlap)
-
-## ----echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5, message=FALSE, warning=FALSE, fig.cap="Cumulative distribution of length-of-stay in RHC vs No-RHC groups.", fig.show='hold'----
-p <- ggplot(df.cumPr, aes(x=time, y=CumPr, color=TRT, fill=TRT, shape=TRT)) + 
-     geom_step(size=1.1) + #ggtitle("Cumulative distribution of length-of-stay")+
-    scale_fill_npg() + scale_color_npg()
-  p <- p + xlab("time (years)") + ylab("Probability of discharge") + ylim(0, 1)+xlim(0,100)+
-    theme(axis.text.x = element_text(face="bold", angle=45),
-          axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-    theme(legend.position = c(0.6, 0.3),
-          legend.background=element_rect(fill="transparent"),
-          panel.grid.minor = element_line(size = .5,colour = "gray92"), 
-          panel.grid.major = element_line(size = .5,colour = "#C0C0C0")) +
-    geom_vline(xintercept=30, linetype="dashed")
-  p
+  theme(legend.position = c(0.6, 0.3), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"), legend.title=element_blank())+
+  geom_vline(xintercept=30, linetype="dashed")
 
 ## -----------------------------------------------------------------------------
 # nonparametric:
-# acm=all-cause mortality
-res.acm.30 <- fit.nonpar(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
+res.30 <- fit.nonpar(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names,
+                     wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
+                     seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.acm.30 <- fit.cox(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names, wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80, seed=17, parallel = FALSE)
+res.cox.30 <- fit.cox(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names,
+                      wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
+                      seed=17, parallel = FALSE)
 
-## ----echo=TRUE, fig.align="center",  fig.width=5, fig.height=5, message=FALSE, warning=FALSE, fig.cap="log-ratio of cumulative hazards for 30-day mortality, using overlap weighting."----
-df1.acm.30 <- rbind( data.frame(time=res.acm.30$time, 
-                                CumHazR=res.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR, Outcome=1,
-                        CIL.CumHazR=res.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.L, 
-                        CIU.CumHazR=res.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.U))
-df2.acm.30 <- data.frame(time=c(min(res.cox.acm.30$time), max(res.cox.acm.30$time)),
-                       CumHazR=rep(res.cox.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR, 2), 
-                       Outcome=rep(3, 2),
-                       CIL.CumHazR=rep(NA, 2),
-                       CIU.CumHazR=rep(NA, 2))
+## ----echo=TRUE, fig.align="center",  fig.width=5, fig.height=5, message=FALSE, warning=FALSE, fig.cap="log-ratio of cumulative hazards for 30-day mortality, using stabilized ATE weighting."----
+df1.30 <- cbind(summary(res.30, event=1, estimand="logHR") %>%
+                      select(time, logCumHazR, CIL.logCumHazR, CIU.logCumHazR), Est.method=1)
+HR.30 <- res.cox.30$trt.eff[[paste("Ev=", 1, sep="")]][c("log.CumHazR", "log.CumHazR.CI.L", "log.CumHazR.CI.U")]
+df2.30 <- data.frame(time=c(min(res.cox.30$time), max(res.cox.30$time)), logCumHazR=HR.30[[1]],
+                  CIL.logCumHazR=NA, CIU.logCumHazR=NA, Est.method=2)
+df.30 <- rbind(df1.30, df2.30)
+df.30$Est.method <- factor(df.30$Est.method)
+levels(df.30$Est.method) <- c("nonpar",
+                               paste("Cox: ", round(res.cox.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR,dig=2),
+                                     ", 95% CI=[",
+                                     round(res.cox.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.L,dig=2),
+                                     ",",
+                                     round(res.cox.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.U,dig=2),
+                                     "]", sep=""))
 
-df.acm.30 <- rbind(df1.acm.30, df2.acm.30)
-df.acm.30$Outcome <- factor(df.acm.30$Outcome)
-levels(df.acm.30$Outcome) <- c("Death-nonpar",  
-                        paste("Death-Cox:", round(res.cox.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR,dig=2),
-                                ", 95% CI=[",
-                                round(res.cox.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.L,dig=2),
-                                ",",
-                                round(res.cox.acm.30$trt.eff[[paste("Ev=", 1, sep="")]]$log.CumHazR.CI.U,dig=2),
-                                "]", sep=""))
-
-p <- ggplot(df.acm.30, aes(x=time, y=CumHazR, color=Outcome, fill=Outcome, shape=Outcome)) +
-  #geom_line(size=1) +
- # ggtitle("log.CumHR(t) of 30-day mortality") +
-  geom_step(size=1.1) + 
-    geom_ribbon(aes(ymin=CIL.CumHazR, ymax=CIU.CumHazR), alpha=0.2, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
-p <- p +
-  xlab("time from admission to ICU (days)") + ylim(0, 0.75)+
-  ylab("log-ratio of CumHaz(t)") + #geom_hline(yintercept=0)+ #ylim(-0.35, 0.05)+
+ggplot(df.30, aes(x=time, y=logCumHazR, color=Est.method, fill=Est.method, shape=Est.method)) +
+  geom_step(linewidth=1.1) + geom_ribbon(aes(ymin=CIL.logCumHazR, ymax=CIU.logCumHazR), alpha=0.2, stat="stepribbon") +
+  scale_color_brewer(palette = "Set1") + scale_fill_brewer(palette = "Set1") +
+  xlab("time from admission to ICU (days)") + ylim(-0.1, 0.55)+
+  ylab("log-ratio of CumHaz(t)") +
   theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.6, 0.8),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"), 
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0")) 
-p
+        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = c(0.6, 0.7),
+        legend.title=element_blank(), legend.text=element_text(size=12),
+        legend.background=element_rect(fill="transparent"))
 
-# getting an estimate at a time point = 30 days: 
-est30 <- get.pointEst(res.acm.30, 30) 
-#cat("HR=", round(exp(est30$trt.eff[[1]]$log.CumHazR), dig=2),
-#    ", 95% CI=[", round(exp(est30$trt.eff[[1]]$log.CumHazR.CI.L), dig=2), ",", 
-#                       round(exp(est30$trt.eff[[1]]$log.CumHazR.CI.U), dig=2), "]\n")
+## ----label=fig162, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,   message=FALSE, warning=FALSE, fig.cap="Risk difference for 30-day mortality.", fig.show='hold'----
+ggplot(summary(res.30, event=1, estimand="RD"),
+  aes(x=time, y=RD)) + geom_step(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.RD, ymax=CIU.RD), alpha=0.2,
+  stat="stepribbon") + xlab("time from admission to ICU (days)") +
+  ylab("Risk difference")
 
-## ----echo=TRUE, fig.align="center",  message=FALSE, warning=FALSE-------------
-get.RD.RMT <- function(res)
-{
-  df <- rbind( data.frame(time=res$time, 
-                      RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD, 
-                      CIL.RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD.CI.L, 
-                      CIU.RD=res$trt.eff[[paste("Ev=", 1, sep="")]]$RD.CI.U,
-                      ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT, 
-                      CIL.ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT.CI.L, 
-                      CIU.ATE.RMT=res$trt.eff[[paste("Ev=", 1, sep="")]]$ATE.RMT.CI.U))
-  
-  return(df)
-}
-df.acm.RD.RMT <- get.RD.RMT(res.acm.30)
+est30 <- get.pointEst(res.30, 30)
+cat("30-day risk difference=", round((est30$trt.eff[[1]]$RD), dig=4),
+    ", 95% CI=[", round((est30$trt.eff[[1]]$RD.CI.L), dig=4), ", ",
+                       round((est30$trt.eff[[1]]$RD.CI.U), dig=4), "]\n", sep="")
 
-## ----label=fig162, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,   message=FALSE, warning=FALSE, fig.cap="Risk differences for 30-day mortality.", fig.show='hold'----
-p <- ggplot(df.acm.RD.RMT, aes(x=time, y=RD)) +
-  geom_step(size=1.1) +  
-    geom_ribbon(aes(ymin=CIL.RD, ymax=CIU.RD), alpha=0.2, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
-p <- p +  #geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + 
-  ylab("Risk difference") + #xlim(0, 150) +
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.8, 0.5),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
-
-#cat("Risk difference=", round((est30$trt.eff[[1]]$RD), dig=4),
-#    ", 95% CI=[", round((est30$trt.eff[[1]]$RD.CI.L), dig=4), ",", 
-#                       round((est30$trt.eff[[1]]$RD.CI.U), dig=4), "]\n")
+## ----label=fig163, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,   message=FALSE, warning=FALSE, fig.cap="Risk ratio for 30-day mortality.", fig.show='hold'----
+ggplot(summary(res.30, event=1, estimand="RR"),
+  aes(x=time, y=RR)) + geom_step(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.RR, ymax=CIU.RR), alpha=0.2,
+  stat="stepribbon") + xlab("time from admission to ICU (days)") +
+  ylab("Risk ratio")
+cat("30-day risk ratio=", round((est30$trt.eff[[1]]$RR), dig=4),
+    ", 95% CI=[", round((est30$trt.eff[[1]]$RR.CI.L), dig=4), ", ",
+    round((est30$trt.eff[[1]]$RR.CI.U), dig=4), "]\n", sep="")
 
 ## ---- label=figRMT30, echo=TRUE, fig.align="center", fig.width=4.5, fig.height=4.5,  message=FALSE, warning=FALSE, fig.cap="Difference in average time lost due to RHC in the 30-day mortality.", fig.show='hold'----
-p <- ggplot(df.acm.RD.RMT, aes(x=time, y=ATE.RMT)) +
-  geom_line(size=1.1) + #ggtitle("Difference in average time lost/gained due to treatment") + 
-    geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) + #, stat="stepribbon") +
-  scale_fill_npg() + scale_color_npg()
-p <- p +  #geom_vline(xintercept=30, linetype="dashed")+
-  xlab("time from admission to ICU (days)") + 
-  ylab("RMT differences (days)") + 
-  theme(axis.text.x = element_text(face="bold", angle=45),
-        axis.text.y = element_text(face="bold"), plot.title = element_text(hjust = 0.5))+
-  theme(legend.position = c(0.8, 0.5),
-        legend.background=element_rect(fill="transparent"),
-        panel.grid.minor = element_line(size = .5,colour = "gray92"),
-        panel.grid.major = element_line(size = .5,colour = "#C0C0C0"))
-p
-#cat("RMTL difference=", round((est30$trt.eff[[1]]$ATE.RMT), dig=2),
-#    ", 95% CI=[", round((est30$trt.eff[[1]]$ATE.RMT.CI.L), dig=2), ",", 
-#                       round((est30$trt.eff[[1]]$ATE.RMT.CI.U), dig=2), "]\n")
+ggplot(summary(res.30, event=1, estimand="ATE.RMT"),
+       aes(x=time, y=ATE.RMT)) + geom_line(linewidth=1.1) +
+  geom_ribbon(aes(ymin=CIL.ATE.RMT, ymax=CIU.ATE.RMT), alpha=0.2) +
+  xlab("time from admission to ICU (days)") +
+  ylab("RMT difference (days)")
+cat("30-day RMT difference=", round((est30$trt.eff[[1]]$ATE.RMT), dig=4),
+    ", 95% CI=[", round((est30$trt.eff[[1]]$ATE.RMT.CI.L), dig=4), ", ",
+    round((est30$trt.eff[[1]]$ATE.RMT.CI.U), dig=4), "]\n", sep="")
 

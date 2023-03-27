@@ -1,15 +1,14 @@
 Package: causalCmprsk
 Type: Package
-Title: Nonparametric and Cox-Based Estimation of ATE in Competing Risks
-Version: 1.0.1
+Title: Nonparametric and Cox-Based Estimation of Average Treatment Effects in Competing Risks
+Version: 1.1.0
 Author: Bella Vakulenko-Lagun, Colin Magdamo, Marie-Laure Charpignon, Bang Zheng, Mark Albers, Sudeshna Das
 Maintainer: Bella Vakulenko-Lagun <blagun@stat.haifa.ac.il>
-Description: Estimation of average treatment effects (ATE) of two static treatment regimes on time-to-event outcomes with K competing events (K can be 1). The method uses propensity scores weighting for emulation of baseline randomization. 
+Description: Estimation of average treatment effects (ATE) of point intervention on time-to-event outcomes with K competing risks (K can be 1). The method uses propensity scores weighting for emulation of baseline randomization. 
 License: GPL (>= 2)
 Encoding: UTF-8
-LazyData: true
 Depends:
-    R (>= 3.6)
+    R (>= 4.0.0)
 Imports: 
     survival,
     inline,
@@ -18,8 +17,9 @@ Imports:
     utils,
     foreach,
     data.table,
-    purrr
-RoxygenNote: 7.1.1
+    purrr,
+    methods
+RoxygenNote: 7.2.3
 Suggests: 
     knitr,
     rmarkdown,
@@ -33,8 +33,7 @@ Suggests:
     DT,
     Hmisc,
     hrbrthemes,
-    summarytools,
-    kableExtra
+    summarytools
 VignetteBuilder: knitr
 URL: https://github.com/Bella2001/causalCmprsk
 BugReports: https://github.com/Bella2001/causalCmprsk/issues

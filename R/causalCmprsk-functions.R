@@ -1,5 +1,6 @@
 .get.S <- function(t, time, surv)	# assumes that t is a scalar
 {
+  if (length(t)!=1) stop("Error in .get.S: t is not a scalar")
   n <- length(time)
   if (t<time[1] && abs(t-time[1])>100*.Machine$double.eps) return(1)
   if (t>time[n] && abs(t-time[n])>100*.Machine$double.eps) return(surv[n])
@@ -9,6 +10,7 @@
 # obtain CIF or CumHaz for arbitrary t:
 .get.CIF <- function(t, time, cuminc)	# assumes that t is a scalar
 {
+  if (length(t)!=1) stop("Error in .get.S: t is not a scalar")
   n <- length(time)
   if (t<time[1] && abs(t-time[1])>100*.Machine$double.eps) return(0)
   if (t>time[n] && abs(t-time[n])>100*.Machine$double.eps) return(cuminc[n])
@@ -18,6 +20,7 @@
 # RMT is an integral of CIF:
 .get.RMT <- function(t, time, cuminc)	# assumes that t is a scalar
 {
+  if (length(t)!=1) stop("Error in .get.S: t is not a scalar")
   n <- length(time)
   if (t<time[1]) return(0)
   else
@@ -522,6 +525,9 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
         apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
         apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      res$trt.0[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]]
+      res$trt.1[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]]
     }
   }
   class(res) <- "cmprsk"
@@ -548,7 +554,6 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
   res.a$OS <- list(time=time, OS.trt.0=exp(OS.0), OS.trt.1=exp(OS.1))
   res.a
 } # end of .estimate.cox
-
 
 
 .sequential.fit.cox <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
@@ -592,8 +597,9 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
     RD <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF - res$trt.0[[paste("Ev=", k, sep="")]]$CIF
     RR <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF / res$trt.0[[paste("Ev=", k, sep="")]]$CIF
     ATE.RMT <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT - res$trt.0[[paste("Ev=", k, sep="")]]$RMT
-
-    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=est[[paste("Ev=", k, sep="")]]$logHR,
+    log.CumHazR <- est[[paste("Ev=", k, sep="")]]$logHR
+    names(log.CumHazR) <- NULL
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.CumHazR,
                                                    RD=RD, RR=RR,
                                                    ATE.RMT=ATE.RMT)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
@@ -688,18 +694,24 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <-
-        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <-
-        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
+      log.CumHazR.CI.L <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
+      names(log.CumHazR.CI.L) <- NULL
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <- log.CumHazR.CI.L
+      log.CumHazR.CI.U <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
+      names(log.CumHazR.CI.U) <- NULL
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <- log.CumHazR.CI.U
 
       # SE:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <-
-        sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+      SD <- sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <- SD
+
+      # pvalue for log.CumHazR
+      pvalue <- 2*pnorm(-abs(res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR"]])/SD)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.pvalue"]] <- pvalue
 
       # bs.avg:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
@@ -776,15 +788,21 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
         apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
         apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      res$trt.0[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]]
+      res$trt.1[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]]
     }
   }
   class(res) <- "cmprsk"
   return(res)
 }
 
-#' Returns point estimates corresponding to a specific time point
+#' Returns point estimates and \code{conf.level}\% confidence intervals corresponding to a specific time point
 #'
-#' @param cmprsk.obj a "cmprsk" object returned by one of the function \code{fit.cox} or \code{fit.nonpar}
+#' The confidence interval returned by this function corresponds to the value \code{conf.level} passed to the function
+#' \code{fit.cox} or \code{fit.nonpar}. The first input argument \code{cmprsk.obj} is a result corresponding to \code{conf.level}.
+#'
+#' @param cmprsk.obj a \code{cmprsk} object returned by one of the functions \code{fit.cox} or \code{fit.nonpar}
 #' @param timepoint a scalar value of the time point of interest
 #'
 #' @return  A list with the following fields:
@@ -795,29 +813,69 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 #'  fields as the number of different types of events in the data set.
 #' For each type of event there is a list of estimates:  \cr }
 #' \itemize{
-#' \item{\code{CumHaz}} point cumulative hazard estimates
-#' \item{\code{CIF}} point cumulative incidence function estimated
-#' \item{\code{RMT}} point estimates of the restricted mean time}
+#' \item{\code{CumHaz}} a point estimate of the cumulative hazard
+#' \item{\code{CumHaz.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the cumulative hazard
+#' \item{\code{CumHaz.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the cumulative hazard
+#' \item{\code{CIF}} a point estimate of the cumulative incidence function
+#' \item{\code{CIF.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the  cumulative incidence function
+#' \item{\code{CIF.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the cumulative incidence function
+#' \item{\code{RMT}} a point estimate of the restricted mean time
+#' \item{\code{RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time
+#' \item{\code{RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time}
 #' \tabular{ll}{
 #' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
 #' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
 #'  fields as the number of different types of events  in the data set.
 #' For each type of event there is a list of estimates:  \cr }
 #' \itemize{
-#' \item{\code{CumHaz}} point cumulative hazard estimates
-#' \item{\code{CIF}} point cumulative incidence function estimated
-#' \item{\code{RMT}} point estimates of the restricted mean time}
+#' \item{\code{CumHaz}} a point estimate of the cumulative hazard
+#' \item{\code{CumHaz.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the cumulative hazard
+#' \item{\code{CumHaz.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the cumulative hazard
+#' \item{\code{CIF}} a point estimate of the cumulative incidence function
+#' \item{\code{CIF.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the  cumulative incidence function
+#' \item{\code{CIF.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the cumulative incidence function
+#' \item{\code{RMT}} a point estimate of the restricted mean time
+#' \item{\code{RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time
+#' \item{\code{RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time}
 #' \tabular{ll}{
 #' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
 #' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
 #'  fields as the number of different types of events  in the data set.
 #' For each type of event there is a list of estimates: \cr}
 #' \itemize{
-#' \item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards in two treatment arms
+#' \item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards between two treatment arms
+#' \item{\code{log.CumHazR.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the log of the ratio of hazards between two treatment arms
+#' \item{\code{log.CumHazR.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the log of the ratio of hazards between two treatment arms
 #' \item{\code{RD}} a point estimate of the risk difference between two treatment arms
+#' \item{\code{RD.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the risk difference between two treatment arms
+#' \item{\code{RD.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the risk difference between two treatment arms
 #' \item{\code{RR}} a point estimate of the risk ratio between two treatment arms
+#' \item{\code{RR.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the risk ratio between two treatment arms
+#' \item{\code{RR.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the risk ratio between two treatment arms
 #' \item{\code{ATE.RMT}} a point estimate of the restricted mean time difference
-#'  between two treatment arms}
+#'  between two treatment arms
+#' \item{\code{ATE.RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time difference between two treatment arms
+#' \item{\code{ATE.RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+#' interval for the restricted mean time difference between two treatment arms}
 #'
 #' @seealso \code{\link{fit.cox}}, \code{\link{fit.nonpar}}, \code{\link{causalCmprsk}}
 #' @examples
@@ -865,15 +923,13 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 #' @export
 get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 {
-  if (class(cmprsk.obj)!="cmprsk")
+  if (! methods::is(cmprsk.obj, "cmprsk"))
   {
-    warning("Error. 'cmprsk.obj' is not of 'cmprsk' type.")
-    return(NULL)
+    stop("Error. 'cmprsk.obj' is not of 'cmprsk' type.\n")
   }
   if (length(timepoint)>1)
   {
-    warning("Error. 'timepoint' is supposed to be a scalar.")
-    return(NULL)
+    stop("Error. 'timepoint' is supposed to be a scalar.\n")
   }
   point.res <- list()
   point.res$time <- timepoint
@@ -1016,7 +1072,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     RR <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF / res$trt.0[[paste("Ev=", k, sep="")]]$CIF
     ATE.RMT <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT - res$trt.0[[paste("Ev=", k, sep="")]]$RMT
 
-    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=est[[paste("Ev=", k, sep="")]]$logHR,
+    log.CumHazR=est[[paste("Ev=", k, sep="")]]$logHR
+    names(log.CumHazR) <- NULL
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.CumHazR,
                                                    RD=RD, RR=RR,
                                                    ATE.RMT=ATE.RMT)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
@@ -1054,7 +1112,8 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     }
     i=0 # to remove the package NOTE
     if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3)
-    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox", ".base.haz.std",
+    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".cox.run", "get.weights", ".estimate.cox",
+                                                      ".base.haz.std",
                                                       ".get.CIF",".get.S", ".get.RMT"),
                              .packages=c("survival")) %dopar%
       {
@@ -1063,7 +1122,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         bs.w <- bs.w/mean(bs.w)
         bs_aggregates <- .cox.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
         if (verbose) setTxtProgressBar(pb, i)
-        bs_aggregates
+        bs_aggregates # by default the results are combined in a list
       }
     if (verbose) close(pb)
     # summarize bs replications and save the results in 'res' object:
@@ -1100,18 +1159,24 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <-
-        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <-
-        quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
+      log.CumHazR.CI.L <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
+      names(log.CumHazR.CI.L) <- NULL
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <- log.CumHazR.CI.L
+      log.CumHazR.CI.U <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
+      names(log.CumHazR.CI.U) <- NULL
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <- log.CumHazR.CI.U
 
       # SE:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <-
-        sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+      SD <- sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <- SD
+
+      # pvalue
+      pvalue <- 2*pnorm(-abs(res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR"]])/SD)
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.pvalue"]] <- pvalue
 
       # bs.avg:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
@@ -1188,6 +1253,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
         apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      res$trt.0[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]]
+      res$trt.1[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]]
     }
     class(res) <- "cmprsk"
     return(res)
@@ -1226,7 +1294,8 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
     i=0 # to remove the package NOTE
     # Create the progress bar.
     if (verbose) pb <- txtProgressBar(min = 1, max = nbs.rep, style=3, file=stdout())
-    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights", ".estimate.nonpar", ".base.haz.std",
+    bs_aggregates <- foreach(i = 1:nbs.rep, .export=c(".nonpar.run", "get.weights",
+                                                      ".estimate.nonpar", ".base.haz.std",
                                                       ".get.CIF",".get.S", ".get.RMT"),
                              .packages=c("survival")) %dopar%
       {
@@ -1358,6 +1427,9 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         apply(bs.RMT$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["ATE.RMT.bs.avg"]] <-
         apply(bs.RMT$ATE[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+
+      res$trt.0[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]]
+      res$trt.1[[paste("Ev=", k, sep="")]][["bs.CumHaz"]] <- bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]]
     }
   }
   class(res) <- "cmprsk"
@@ -1390,7 +1462,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' population for which the ATE will be estimated.
 #' The default is "unadj" - this will not adjust for possible
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' in data from a randomized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 #' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
 #' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
@@ -1402,43 +1474,116 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' analytical confidence intervals in \code{fit.nonpar}
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
-#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using 2 cores simultaneously. The default value is FALSE
+#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel,
+#' using several cores simultaneously. The default value is FALSE. In parallel execution, the number
+#' of available cores is detected, and the parallel jobs are assigned to the number of
+#' detected available cores minus one.
 #' @param verbose a logical flag indicating whether to show a progress of bootstrap.
 #' The progress bar is shown only for sequential bootstrap computation.
 #' The default value is FALSE.
 #'
-#' @return  A list with the following fields:
+#' @return  A list of class \code{cmprsk} with the following fields:
 #' \tabular{ll}{
 #' \code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
-#' \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
-#' corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the number of
-#'  fields as the number of different types of events in the data set.
-#' For each type of event there is a list of estimates:  \cr }
+#' \code{trt.0} \tab \cr a list of estimates of the counterfactual parameters
+#' corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0}
+#' has K
+#'  fields as the number of competing events in the data set.
+#' For each competing risk there is a list of point estimates, their standard errors and
+#' \code{conf.level}\% confidence intervals:  \cr }
 #' \itemize{
 #' \item{\code{CumHaz}} a vector of cumulative hazard estimates
-#' \item{\code{CIF}} a vector of cumulative incidence functions
-#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \item{\code{CIF}} a vector of cumulative incidence functions (CIF)
+#' \item{\code{RMT}} a vector of restricted mean time (RMT) estimates
+#' \item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+#' of cumulative hazard estimates
+#' \item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for CIF estimates
+#' \item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for CIF estimates
+#' \item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+#' of CIF estimates
+#' \item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for RMT estimates
+#' \item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for RMT estimates
+#' \item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+#' of RMT estimates
+#' \item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+#' with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+#' }
 #' \tabular{ll}{
-#' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
-#' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
-#'  fields as the number of different types of events  in the data set.
-#' For each type of event there is a list of estimates:  \cr }
+#' \code{trt.1} \tab \cr a list of estimates of the counterfactual parameters
+#' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has K
+#'  fields as the number of competing events (risks) in the data set.
+#' For each competing risk there is a list of point estimates:  \cr }
 #' \itemize{
 #' \item{\code{CumHaz}} a vector of cumulative hazard estimates
 #' \item{\code{CIF}} a vector of cumulative incidence functions
-#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \item{\code{RMT}} a vector of restricted mean time estimates
+#' \item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+#' of cumulative hazard estimates
+#' \item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for CIF estimates
+#' \item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for CIF estimates
+#' \item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+#' for CIF estimates
+#' \item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for RMT estimates
+#' \item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for RMT estimates
+#' \item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the RMT estimates
+#' \item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+#' with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+#' }
 #' \tabular{ll}{
 #' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
 #' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
-#'  fields as the number of different types of events  in the data set.
-#' For each type of event there is a list of estimates: \cr}
+#'  fields as the number of different types of events (risks)  in the data set.
+#' For each competing risk there is a list of estimates: \cr}
 #' \itemize{
-#' \item{\code{log.CumHazR}} an estimate of the log of the hazard ratio. It is a scalar since the Cox model is assumed.
-#' \item{\code{RD}} a vector of time-varying risk difference between two treatment arms
-#' \item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
-#' \item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
-#'  between two treatment arms}
+#' \item{\code{log.CumHazR}} an estimate of the log of the hazard ratio.
+#' It is a scalar since the Cox model is assumed.
+#' \item{\code{RD}} a vector of time-varying Risk Difference between two treatment arms
+#' \item{\code{RR}} a vector of time-varying Risk Ratio between two treatment arms
+#' \item{\code{ATE.RMT}} a vector of the time-varying Restricted Mean Time Difference
+#'  between two treatment arms
+#' \item{\code{log.CumHazR.CI.L}} a bootstrap-based quantile estimate of the
+#'  lower confidence limit of \code{log.CumHazR}
+#' \item{\code{log.CumHazR.CI.U}} a bootstrap-based quantile estimate of the
+#'  upper confidence limit of \code{log.CumHazR}
+#' \item{\code{log.CumHazR.SE}} a bootstrap-based estimated standard error
+#' of \code{log.CumHazR}
+#' \item{\code{log.CumHazR.pvalue}} p-value from a Wald test of a two-sided hypothesis H0: HR(A=1)/HR(A=0)=1
+#' \item{\code{RD.CI.L}} a vector of bootstrap-based quantile estimates of the
+#'  lower confidence limits of the Risk Difference estimates
+#' \item{\code{RD.CI.U}} a vector of bootstrap-based quantile estimate of the
+#'  upper confidence limits of the Risk Difference estimates
+#' \item{\code{RD.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the Risk Difference
+#' \item{\code{RR.CI.L}} a vector of bootstrap-based quantile estimates of the
+#'  lower confidence limits of the Risk Ratio estimates
+#' \item{\code{RR.CI.U}} a vector of bootstrap-based quantile estimate of the
+#'  upper confidence limits of the Risk Ratio estimates
+#' \item{\code{RR.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the Risk Ratio
+#' \item{\code{ATE.RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for the RMT difference estimates
+#' \item{\code{ATE.RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for the RMT difference estimates
+#' \item{\code{ATE.RMT.SE}} a vector of bootstrap-based estimated standard errors
+#' of the RMT difference estimates
+#'  }
 #'
 #' @seealso \code{\link{fit.nonpar}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
 #'
@@ -1496,23 +1641,32 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = TRUE)) {
       #      num_cores <- round(parallel::detectCores()/2,digits = 0)
-      num_cores <- 2
-      cluster <- parallel::makeCluster(num_cores)
+      chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+      if (nzchar(chk) && chk == "TRUE")
+        { # use 2 cores in CRAN/Travis/AppVeyor
+        num_cores <- 2L
+        }
+      else
+        { # use all cores in devtools::test()
+          num_cores <- parallel::detectCores() - 1
+      }
+      cluster <- parallel::makeCluster(spec=num_cores)
       doParallel::registerDoParallel(cl = cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = TRUE)){
       num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
-      cluster <- parallel::makeCluster(num_cores)
+      cluster <- parallel::makeCluster(spec=num_cores)
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    .parallel.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    res <- .parallel.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    parallel::stopCluster(cluster)
   }
   else
-    .sequential.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
-
+  res <- .sequential.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+  res
 }
 
 #' Nonparametric estimation of ATE corresponding to the target population
@@ -1555,13 +1709,15 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' analytical confidence intervals in \code{fit.nonpar}
 #' @param nbs.rep number of bootstrap replications
 #' @param seed the random seed for the bootstrap, in order to make the results reproducible
-#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel
-#' using 2 cores simultaneously. The default value is FALSE
+#' @param parallel a logical flag indicating whether to perform bootstrap sequentially or in parallel,
+#' using several cores simultaneously. The default value is FALSE. In parallel execution, the number
+#' of available cores is detected, and the parallel jobs are assigned to the number of
+#' detected available cores minus one.
 #' @param verbose a logical flag indicating whether to show a progress of bootstrap.
 #' The progress bar is shown only for sequential bootstrap computation.
 #' The default value is FALSE.
 #'
-#' @return  A list with the following fields:
+#' @return  A list of class \code{cmprsk} with the following fields:
 #' \tabular{ll}{
 #' \code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
 #' \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
@@ -1570,8 +1726,29 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' For each type of event there is a list of estimates:  \cr }
 #' \itemize{
 #' \item{\code{CumHaz}} a vector of cumulative hazard estimates
-#' \item{\code{CIF}} a vector of cumulative incidence functions
-#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \item{\code{CIF}} a vector of cumulative incidence functions (CIF)
+#' \item{\code{RMT}} a vector of restricted mean time (RMT) estimates
+#' \item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+#' of cumulative hazard estimates
+#' \item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for CIF estimates
+#' \item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for CIF estimates
+#' \item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+#' of CIF estimates
+#' \item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for RMT estimates
+#' \item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for RMT estimates
+#' \item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+#' of RMT estimates
+#' \item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+#' with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+#' }
 #' \tabular{ll}{
 #' \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
 #' corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
@@ -1580,7 +1757,28 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' \itemize{
 #' \item{\code{CumHaz}} a vector of cumulative hazard estimates
 #' \item{\code{CIF}} a vector of cumulative incidence functions
-#' \item{\code{RMT}} a vector of restricted mean time estimates}
+#' \item{\code{RMT}} a vector of restricted mean time estimates
+#' \item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for cumulative hazard estimates
+#' \item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+#' of cumulative hazard estimates
+#' \item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for CIF estimates
+#' \item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for CIF estimates
+#' \item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+#' for CIF estimates
+#' \item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for RMT estimates
+#' \item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for RMT estimates
+#' \item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the RMT estimates
+#' \item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+#' with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+#' }
 #' \tabular{ll}{
 #' \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
 #' corresponding to the type of event \code{E}. \code{trt.eff} has the number of
@@ -1588,10 +1786,35 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' For each type of event there is a list of estimates: \cr}
 #' \itemize{
 #' \item{\code{log.CumHazR}} a vector of the log of the time-varying ratio of hazards in two treatment arms
-#' \item{\code{RD}} a vector of time-varying risk difference between two treatment arms
-#' \item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
-#' \item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
-#'  between two treatment arms}
+#' \item{\code{RD}} a vector of time-varying Risk Difference between two treatment arms
+#' \item{\code{RR}} a vector of time-varying Risk Ratio between two treatment arms
+#' \item{\code{ATE.RMT}} a vector of the time-varying Restricted Mean Time Difference
+#'  between two treatment arms
+#' \item{\code{log.CumHazR.CI.L}} a vector of bootstrap-based quantile estimates of the
+#'  lower confidence limits of \code{log.CumHazR}
+#' \item{\code{log.CumHazR.CI.U}} a vector of bootstrap-based quantile estimates of the
+#'  upper confidence limits of \code{log.CumHazR}
+#' \item{\code{log.CumHazR.SE}} a vector of bootstrap-based estimated standard errors
+#' of \code{log.CumHazR}
+#' \item{\code{RD.CI.L}} a vector of bootstrap-based quantile estimates of the
+#'  lower confidence limits of the Risk Difference estimates
+#' \item{\code{RD.CI.U}} a vector of bootstrap-based quantile estimate of the
+#'  upper confidence limits of the Risk Difference estimates
+#' \item{\code{RD.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the Risk Difference
+#' \item{\code{RR.CI.L}} a vector of bootstrap-based quantile estimates of the
+#'  lower confidence limits of the Risk Ratio estimates
+#' \item{\code{RR.CI.U}} a vector of bootstrap-based quantile estimate of the
+#'  upper confidence limits of the Risk Ratio estimates
+#' \item{\code{RR.SE}} a vector of the bootstrap-based estimated standard errors
+#' of the Risk Ratio
+#' \item{\code{ATE.RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+#'  lower confidence limits for the RMT difference estimates
+#' \item{\code{ATE.RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+#'  upper confidence limits for the RMT difference estimates
+#' \item{\code{ATE.RMT.SE}} a vector of bootstrap-based estimated standard errors
+#' of the RMT difference estimates
+#'  }
 #'
 #' @seealso \code{\link{fit.cox}}, \code{\link{get.pointEst}}, \code{\link{causalCmprsk}}
 #'
@@ -1648,22 +1871,173 @@ fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
     # if windows (snow)
     if(grepl('win',get_os(),ignore.case = TRUE)) {
 #      num_cores <- round(parallel::detectCores()/2,digits = 0)
-      num_cores <- 2
-      cluster <- parallel::makeCluster(num_cores)
-      doParallel::registerDoParallel(cl = cluster)
+      chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+      if (nzchar(chk) && chk == "TRUE")
+      { # use 2 cores in CRAN/Travis/AppVeyor
+        num_cores <- 2L
+      }
+      else
+      { # use all cores in devtools::test()
+        num_cores <- parallel::detectCores() - 1
+      }
+      cluster <- parallel::makeCluster(spec=num_cores)
+      doParallel::registerDoParallel(cl=cluster)
     }
 
     # if unix (multicore)
     if(grepl('unix|linux',get_os(),ignore.case = TRUE)){
       num_cores <- 2 # https://stackoverflow.com/questions/41307178/error-processing-vignette-failed-with-diagnostics-4-simultaneous-processes-spa
-      cluster <- parallel::makeCluster(num_cores)
+      cluster <- parallel::makeCluster(spec=num_cores)
       doParallel::registerDoParallel(cl=cluster)
     }
-
-    .parallel.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    res <- .parallel.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    parallel::stopCluster(cl=cluster)
   }
   else
-    .sequential.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
-
+    res <- .sequential.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+  res
 }
+
+#' Summary of Event-specific Cumulative Hazards, Cumulative Incidence Functions and Various Treatment Effects
+#'
+#' Returns an object of class \code{data.frame} containing the summary extracted from the \code{cmprsk} object.
+#'
+#' @param object an object of class \code{cmprsk} (output from \code{fit.nonpar} or \code{fit.cox} functions)
+#' @param event an integer number (a code) of an event of interest
+#' @param estimand a character string naming the type of estimand to extract from \code{object}. \code{estimand} can be one of the following: "CumHaz" (Cumulative Hazard function),
+#' "CIF" (Cumulative Incidence Function), "RMT" (Restricted Mean Time),
+#' "logHR" (logarithm of the ratio of Cumulative Hazards in two treatment arms),
+#' "RD" (Risk Difference, or the difference between the CIFs in two treatment arms),
+#' "RR" (Risk Ratio, or the ratio of CIFs in two treatment arms),
+#' "ATE.RMT" (Restricted mean time gained/lost due to treatment, or the difference between RMTs in two treatment arms).
+#' The default value is "CIF".
+#' @param ... This is not currently used, included for future methods.
+#'
+#' @return  \code{summary.cmprsk} returns a \code{data.frame} object with 7 or 6 columns:
+#' the time vector, an indicator of the treatment arm
+#' (if the requested \code{estimand} is one of c("logHR", "RD", "RR", "ATE.RMT"), this column is omitted),
+#' an indicator of the type of event,
+#' the point estimate for the requested \code{estimand}, the lower and upper bounds of the
+#' confidence interval (for \code{conf.level} \% of the confidence level),
+#' and the standard error of the point estimate. For example, if \code{estimand="CIF"},
+#' the returned \code{data.frame} will include the following columns:
+#' \code{time}, \code{TRT}, \code{Event}, \code{CIF}, \code{CIL.CIF}, \code{CIU.CIF}, \code{SE.CIF}.
+
+#' @seealso \code{\link{fit.cox}}, \code{\link{fit.nonpar}}, \code{\link{causalCmprsk}}
+#'
+#' @examples
+#' # create a data set
+#' n <- 1000
+#' set.seed(7)
+#' c1 <-  runif(n)
+#' c2 <- as.numeric(runif(n)< 0.2)
+#' set.seed(77)
+#' cf.m.T1 <- rweibull(n, shape=1, scale=exp(-(-1 + 2*c1)))
+#' cf.m.T2 <-  rweibull(n, shape=1, scale=exp(-(1 + 1*c2)))
+#' cf.m.T <- pmin( cf.m.T1, cf.m.T2)
+#' cf.m.E <- rep(0, n)
+#' cf.m.E[cf.m.T1<=cf.m.T2] <- 1
+#' cf.m.E[cf.m.T2<cf.m.T1] <- 2
+#' set.seed(77)
+#' cf.s.T1 <- rweibull(n, shape=1, scale=exp(-1*c1 ))
+#' cf.s.T2 <-  rweibull(n, shape=1, scale=exp(-2*c2))
+#' cf.s.T <- pmin( cf.s.T1, cf.s.T2)
+#' cf.s.E <- rep(0, n)
+#' cf.s.E[cf.s.T1<=cf.s.T2] <- 1
+#' cf.s.E[cf.s.T2<cf.s.T1] <- 2
+#' exp.z <- exp(0.5 + c1 - c2)
+#' pr <- exp.z/(1+exp.z)
+#' TRT <- ifelse( runif(n)< pr, 1, 0)
+#' X <- ifelse(TRT==1, cf.m.T, cf.s.T)
+#' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
+#' covs.names <- c("c1", "c2")
+#' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
+#' # Nonparametric estimation:
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE",
+#'  bs=TRUE, nbs.rep=40, seed=1, parallel = FALSE) # in practice, nbs.rep should be much larger
+#' # summarizing results on the Risk Difference for event=2
+#' fit.summary <- summary(object=res.ATE, event = 2, estimand="RD")
+#' head(fit.summary)
+#' # summarizing results on the CIFs for event=1
+#' fit.summary <- summary(object=res.ATE, event = 1, estimand="CIF")
+#' head(fit.summary)
+#'
+#' @references M.-L. Charpignon, B. Vakulenko-Lagun, B. Zheng, C. Magdamo, B. Su, K.E. Evans, S. Rodriguez, et al. 2022. Causal inference in medical records and complementary systems pharmacology for metformin drug repurposing towards dementia. Nature Communications 13:7652.
+#'
+#' @export
+summary.cmprsk <- function(object, event, estimand="CIF", ...)
+{
+  # S3 method for class 'cmprsk'
+  if (estimand %in% c("CumHaz", "CIF", "RMT"))
+  {
+    df <- rbind( data.frame(time=object$time, TRT=1, Event=event,
+                            CIF=object$trt.1[[paste("Ev=", event, sep="")]]$CIF,
+                            RMT=object$trt.1[[paste("Ev=", event, sep="")]]$RMT,
+                            CumHaz=object$trt.1[[paste("Ev=", event, sep="")]]$CumHaz,
+                            CIL.CIF=object$trt.1[[paste("Ev=", event, sep="")]]$CIF.CI.L,
+                            CIU.CIF=object$trt.1[[paste("Ev=", event, sep="")]]$CIF.CI.U,
+                            SE.CIF=object$trt.1[[paste("Ev=", event, sep="")]]$CIF.SE,
+                            CIL.RMT=object$trt.1[[paste("Ev=", event, sep="")]]$RMT.CI.L,
+                            CIU.RMT=object$trt.1[[paste("Ev=", event, sep="")]]$RMT.CI.U,
+                            SE.RMT=object$trt.1[[paste("Ev=", event, sep="")]]$RMT.SE,
+                            CIL.CumHaz=object$trt.1[[paste("Ev=", event, sep="")]]$CumHaz.CI.L,
+                            CIU.CumHaz=object$trt.1[[paste("Ev=", event, sep="")]]$CumHaz.CI.U,
+                            SE.CumHaz=object$trt.1[[paste("Ev=", event, sep="")]]$CumHaz.SE
+    ),
+    data.frame(time=object$time, TRT=0, Event=event,
+               CIF=object$trt.0[[paste("Ev=", event, sep="")]]$CIF,
+               RMT=object$trt.0[[paste("Ev=", event, sep="")]]$RMT,
+               CumHaz=object$trt.0[[paste("Ev=", event, sep="")]]$CumHaz,
+               CIL.CIF=object$trt.0[[paste("Ev=", event, sep="")]]$CIF.CI.L,
+               CIU.CIF=object$trt.0[[paste("Ev=", event, sep="")]]$CIF.CI.U,
+               SE.CIF=object$trt.0[[paste("Ev=", event, sep="")]]$CIF.SE,
+               CIL.RMT=object$trt.0[[paste("Ev=", event, sep="")]]$RMT.CI.L,
+               CIU.RMT=object$trt.0[[paste("Ev=", event, sep="")]]$RMT.CI.U,
+               SE.RMT=object$trt.0[[paste("Ev=", event, sep="")]]$RMT.SE,
+               CIL.CumHaz=object$trt.0[[paste("Ev=", event, sep="")]]$CumHaz.CI.L,
+               CIU.CumHaz=object$trt.0[[paste("Ev=", event, sep="")]]$CumHaz.CI.U,
+               SE.CumHaz=object$trt.0[[paste("Ev=", event, sep="")]]$CumHaz.SE)
+    )
+    if (estimand=="CumHaz")
+      df <- df[, c("time", "TRT", "Event", "CumHaz", "CIL.CumHaz", "CIU.CumHaz", "SE.CumHaz")]
+    if (estimand=="CIF")
+      df <- df[, c("time", "TRT", "Event", "CIF", "CIL.CIF", "CIU.CIF", "SE.CIF")]
+    if (estimand=="RMT")
+      df <- df[, c("time", "TRT", "Event", "RMT", "CIL.RMT", "CIU.RMT", "SE.RMT")]
+  }
+  else if (estimand %in% c("logHR", "RD", "RR", "ATE.RMT"))
+  {
+    df <- data.frame(time=object$time, Event=event,
+                     logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR,
+                     CIL.logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR.CI.L,
+                     CIU.logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR.CI.U,
+                     SE.logCumHazR=object$trt.eff[[paste("Ev=", event, sep="")]]$log.CumHazR.SE,
+                     RD=object$trt.eff[[paste("Ev=", event, sep="")]]$RD,
+                     CIL.RD=object$trt.eff[[paste("Ev=", event, sep="")]]$RD.CI.L,
+                     CIU.RD=object$trt.eff[[paste("Ev=", event, sep="")]]$RD.CI.U,
+                     SE.RD=object$trt.eff[[paste("Ev=", event, sep="")]]$RD.SE,
+                     RR=object$trt.eff[[paste("Ev=", event, sep="")]]$RR,
+                     CIL.RR=object$trt.eff[[paste("Ev=", event, sep="")]]$RR.CI.L,
+                     CIU.RR=object$trt.eff[[paste("Ev=", event, sep="")]]$RR.CI.U,
+                     SE.RR=object$trt.eff[[paste("Ev=", event, sep="")]]$RR.SE,
+                     ATE.RMT=object$trt.eff[[paste("Ev=", event, sep="")]]$ATE.RMT,
+                     CIL.ATE.RMT=object$trt.eff[[paste("Ev=", event, sep="")]]$ATE.RMT.CI.L,
+                     CIU.ATE.RMT=object$trt.eff[[paste("Ev=", event, sep="")]]$ATE.RMT.CI.U,
+                     SE.ATE.RMT=object$trt.eff[[paste("Ev=", event, sep="")]]$ATE.RMT.SE)
+    if (estimand=="logHR")
+      df <- df[, c("time", "Event", "logCumHazR", "CIL.logCumHazR", "CIU.logCumHazR", "SE.logCumHazR")]
+    if (estimand=="RD")
+      df <- df[, c("time", "Event", "RD", "CIL.RD", "CIU.RD", "SE.RD")]
+    if (estimand=="RR")
+      df <- df[, c("time", "Event", "RR", "CIL.RR", "CIU.RR", "SE.RR")]
+    if (estimand=="ATE.RMT")
+      df <- df[, c("time", "Event", "ATE.RMT", "CIL.ATE.RMT", "CIU.ATE.RMT", "SE.ATE.RMT")]
+  }
+  else # error message
+  {
+    stop("'estimand' is not one of the following: c('CumHaz', 'CIF', 'RMT', 'logHR', 'RD', 'RR', 'ATE.RMT'). \n")
+  }
+  return(df)
+}
+
 

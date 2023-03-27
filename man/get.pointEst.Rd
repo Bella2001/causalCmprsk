@@ -2,12 +2,12 @@
 % Please edit documentation in R/causalCmprsk-functions.R
 \name{get.pointEst}
 \alias{get.pointEst}
-\title{Returns point estimates corresponding to a specific time point}
+\title{Returns point estimates and \code{conf.level}\% confidence intervals corresponding to a specific time point}
 \usage{
 get.pointEst(cmprsk.obj, timepoint)
 }
 \arguments{
-\item{cmprsk.obj}{a "cmprsk" object returned by one of the function \code{fit.cox} or \code{fit.nonpar}}
+\item{cmprsk.obj}{a \code{cmprsk} object returned by one of the functions \code{fit.cox} or \code{fit.nonpar}}
 
 \item{timepoint}{a scalar value of the time point of interest}
 }
@@ -20,32 +20,73 @@ corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the
  fields as the number of different types of events in the data set.
 For each type of event there is a list of estimates:  \cr }
 \itemize{
-\item{\code{CumHaz}} point cumulative hazard estimates
-\item{\code{CIF}} point cumulative incidence function estimated
-\item{\code{RMT}} point estimates of the restricted mean time}
+\item{\code{CumHaz}} a point estimate of the cumulative hazard
+\item{\code{CumHaz.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the cumulative hazard
+\item{\code{CumHaz.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the cumulative hazard
+\item{\code{CIF}} a point estimate of the cumulative incidence function
+\item{\code{CIF.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the  cumulative incidence function
+\item{\code{CIF.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the cumulative incidence function
+\item{\code{RMT}} a point estimate of the restricted mean time
+\item{\code{RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the restricted mean time
+\item{\code{RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the restricted mean time}
 \tabular{ll}{
 \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
 corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
  fields as the number of different types of events  in the data set.
 For each type of event there is a list of estimates:  \cr }
 \itemize{
-\item{\code{CumHaz}} point cumulative hazard estimates
-\item{\code{CIF}} point cumulative incidence function estimated
-\item{\code{RMT}} point estimates of the restricted mean time}
+\item{\code{CumHaz}} a point estimate of the cumulative hazard
+\item{\code{CumHaz.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the cumulative hazard
+\item{\code{CumHaz.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the cumulative hazard
+\item{\code{CIF}} a point estimate of the cumulative incidence function
+\item{\code{CIF.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the  cumulative incidence function
+\item{\code{CIF.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the cumulative incidence function
+\item{\code{RMT}} a point estimate of the restricted mean time
+\item{\code{RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the restricted mean time
+\item{\code{RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the restricted mean time}
 \tabular{ll}{
 \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
 corresponding to the type of event \code{E}. \code{trt.eff} has the number of
  fields as the number of different types of events  in the data set.
 For each type of event there is a list of estimates: \cr}
 \itemize{
-\item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards in two treatment arms
+\item{\code{log.CumHazR}} a point estimate of the log of the ratio of hazards between two treatment arms
+\item{\code{log.CumHazR.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the log of the ratio of hazards between two treatment arms
+\item{\code{log.CumHazR.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the log of the ratio of hazards between two treatment arms
 \item{\code{RD}} a point estimate of the risk difference between two treatment arms
+\item{\code{RD.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the risk difference between two treatment arms
+\item{\code{RD.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the risk difference between two treatment arms
 \item{\code{RR}} a point estimate of the risk ratio between two treatment arms
+\item{\code{RR.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the risk ratio between two treatment arms
+\item{\code{RR.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the risk ratio between two treatment arms
 \item{\code{ATE.RMT}} a point estimate of the restricted mean time difference
- between two treatment arms}
+ between two treatment arms
+\item{\code{ATE.RMT.CI.L}} a bootstrap-based quantile estimate of a lower bound of a \code{conf.level}\% confidence
+interval for the restricted mean time difference between two treatment arms
+\item{\code{ATE.RMT.CI.U}} a bootstrap-based quantile estimate of an upper bound of a \code{conf.level}\% confidence
+interval for the restricted mean time difference between two treatment arms}
 }
 \description{
-Returns point estimates corresponding to a specific time point
+The confidence interval returned by this function corresponds to the value \code{conf.level} passed to the function
+\code{fit.cox} or \code{fit.nonpar}. The first input argument \code{cmprsk.obj} is a result corresponding to \code{conf.level}.
 }
 \examples{
 # create a data set

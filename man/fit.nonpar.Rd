@@ -59,15 +59,17 @@ analytical confidence intervals in \code{fit.nonpar}}
 
 \item{seed}{the random seed for the bootstrap, in order to make the results reproducible}
 
-\item{parallel}{a logical flag indicating whether to perform bootstrap sequentially or in parallel
-using 2 cores simultaneously. The default value is FALSE}
+\item{parallel}{a logical flag indicating whether to perform bootstrap sequentially or in parallel,
+using several cores simultaneously. The default value is FALSE. In parallel execution, the number
+of available cores is detected, and the parallel jobs are assigned to the number of
+detected available cores minus one.}
 
 \item{verbose}{a logical flag indicating whether to show a progress of bootstrap.
 The progress bar is shown only for sequential bootstrap computation.
 The default value is FALSE.}
 }
 \value{
-A list with the following fields:
+A list of class \code{cmprsk} with the following fields:
 \tabular{ll}{
 \code{time}  \tab \cr a vector of time points for which all the parameters are estimated \cr
 \code{trt.0} \tab \cr a list of estimates of the absolute counterfactual parameters
@@ -76,8 +78,29 @@ corresponding to \code{A}=0 and the type of event \code{E}. \code{trt.0} has the
 For each type of event there is a list of estimates:  \cr }
 \itemize{
 \item{\code{CumHaz}} a vector of cumulative hazard estimates
-\item{\code{CIF}} a vector of cumulative incidence functions
-\item{\code{RMT}} a vector of restricted mean time estimates}
+\item{\code{CIF}} a vector of cumulative incidence functions (CIF)
+\item{\code{RMT}} a vector of restricted mean time (RMT) estimates
+\item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for cumulative hazard estimates
+\item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for cumulative hazard estimates
+\item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+of cumulative hazard estimates
+\item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for CIF estimates
+\item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for CIF estimates
+\item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+of CIF estimates
+\item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for RMT estimates
+\item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for RMT estimates
+\item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+of RMT estimates
+\item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+}
 \tabular{ll}{
 \code{trt.1} \tab \cr a list of estimates of the absolute counterfactual parameters
 corresponding to \code{A}=1 and the type of event \code{E}. \code{trt.1} has the number of
@@ -86,7 +109,28 @@ For each type of event there is a list of estimates:  \cr }
 \itemize{
 \item{\code{CumHaz}} a vector of cumulative hazard estimates
 \item{\code{CIF}} a vector of cumulative incidence functions
-\item{\code{RMT}} a vector of restricted mean time estimates}
+\item{\code{RMT}} a vector of restricted mean time estimates
+\item{\code{CumHaz.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for cumulative hazard estimates
+\item{\code{CumHaz.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for cumulative hazard estimates
+\item{\code{CumHaz.SE}} a vector of the bootstrap-based estimated standard errors
+of cumulative hazard estimates
+\item{\code{CIF.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for CIF estimates
+\item{\code{CIF.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for CIF estimates
+\item{\code{CIF.SE}} a vector of bootstrap-based estimated standard error
+for CIF estimates
+\item{\code{RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for RMT estimates
+\item{\code{RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for RMT estimates
+\item{\code{RMT.SE}} a vector of the bootstrap-based estimated standard errors
+of the RMT estimates
+\item{\code{bs.CumHaz}} a matrix of dimension \code{nbs.rep} by the length of \code{time} vector,
+with cumulative hazard estimates for \code{nbs.rep} bootstrap samples
+}
 \tabular{ll}{
 \code{trt.eff} \tab \cr a list of estimates of the treatment effect measures
 corresponding to the type of event \code{E}. \code{trt.eff} has the number of
@@ -94,10 +138,35 @@ corresponding to the type of event \code{E}. \code{trt.eff} has the number of
 For each type of event there is a list of estimates: \cr}
 \itemize{
 \item{\code{log.CumHazR}} a vector of the log of the time-varying ratio of hazards in two treatment arms
-\item{\code{RD}} a vector of time-varying risk difference between two treatment arms
-\item{\code{RR}} a vector of time-varying risk ratio between two treatment arms
-\item{\code{ATE.RMT}} a vector of the time-varying restricted mean time difference
- between two treatment arms}
+\item{\code{RD}} a vector of time-varying Risk Difference between two treatment arms
+\item{\code{RR}} a vector of time-varying Risk Ratio between two treatment arms
+\item{\code{ATE.RMT}} a vector of the time-varying Restricted Mean Time Difference
+ between two treatment arms
+\item{\code{log.CumHazR.CI.L}} a vector of bootstrap-based quantile estimates of the
+ lower confidence limits of \code{log.CumHazR}
+\item{\code{log.CumHazR.CI.U}} a vector of bootstrap-based quantile estimates of the
+ upper confidence limits of \code{log.CumHazR}
+\item{\code{log.CumHazR.SE}} a vector of bootstrap-based estimated standard errors
+of \code{log.CumHazR}
+\item{\code{RD.CI.L}} a vector of bootstrap-based quantile estimates of the
+ lower confidence limits of the Risk Difference estimates
+\item{\code{RD.CI.U}} a vector of bootstrap-based quantile estimate of the
+ upper confidence limits of the Risk Difference estimates
+\item{\code{RD.SE}} a vector of the bootstrap-based estimated standard errors
+of the Risk Difference
+\item{\code{RR.CI.L}} a vector of bootstrap-based quantile estimates of the
+ lower confidence limits of the Risk Ratio estimates
+\item{\code{RR.CI.U}} a vector of bootstrap-based quantile estimate of the
+ upper confidence limits of the Risk Ratio estimates
+\item{\code{RR.SE}} a vector of the bootstrap-based estimated standard errors
+of the Risk Ratio
+\item{\code{ATE.RMT.CI.L}} a vector of bootstrap-based quantile estimate of
+ lower confidence limits for the RMT difference estimates
+\item{\code{ATE.RMT.CI.U}} a vector of bootstrap-based quantile estimate of
+ upper confidence limits for the RMT difference estimates
+\item{\code{ATE.RMT.SE}} a vector of bootstrap-based estimated standard errors
+of the RMT difference estimates
+ }
 }
 \description{
 Implements nonparametric estimation (based on the weighted Aalen-Johansen estimator) of ATE meaning that
