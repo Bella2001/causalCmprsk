@@ -1616,12 +1616,11 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 #' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
-#' par(new=TRUE)
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 #' # Cox-based estimation:
 #' res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
 #' cox.pe <- get.pointEst(res.cox.ATE, 0.5)
-#' cox.pe$trt.eff[[1]]$RD #-0.1894038
+#' cox.pe$trt.eff[[1]]$RD
 #'
 #' # please see our package vignette for practical examples
 #'
@@ -1847,12 +1846,11 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 #' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
-#' par(new=TRUE)
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 #' # Nonparametric estimation:
 #' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
 #' nonpar.pe <- get.pointEst(res.ATE, 0.5)
-#' nonpar.pe$trt.eff[[1]]$RD # -0.1776143
+#' nonpar.pe$trt.eff[[1]]$RD
 #'
 #' # please see our package vignette for practical examples
 #'
