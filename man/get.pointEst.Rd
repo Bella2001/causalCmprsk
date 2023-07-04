@@ -115,16 +115,18 @@ X <- ifelse(TRT==1, cf.m.T, cf.s.T)
 E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 covs.names <- c("c1", "c2")
 data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+trt.formula <- as.formula(form.txt)
+wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 par(new=TRUE)
 hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 # Nonparametric estimation:
-res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+res.ATE <- fit.nonpar(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 nonpar.pe <- get.pointEst(res.ATE, 0.5)
 nonpar.pe$trt.eff[[1]]$RD
 # Cox-based estimation:
-res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+res.cox.ATE <- fit.cox(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 cox.pe <- get.pointEst(res.cox.ATE, 0.5)
 cox.pe$trt.eff[[1]]$RD
 

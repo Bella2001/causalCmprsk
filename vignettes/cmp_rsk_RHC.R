@@ -154,14 +154,18 @@ covs.names <- c("age", "sex_Male", "edu", "race_black", "race_other",
 
 
 ## -----------------------------------------------------------------------------
-ps.stab.ATE <- get.weights(df=rhc, A="RHC", C=covs.names, wtype = "stab.ATE") 
+form.txt <- paste0("RHC", " ~ ", paste0(covs.names, collapse = "+"))
+trt.formula <- as.formula(form.txt)
+ps.stab.ATE <- get.weights(formula=trt.formula, data=rhc, wtype = "stab.ATE") 
 
 ## ---- fig.align="center", fig.cap="Visual test of goodness-of-fit of a PS model and Hosmer-Lemeshow test.", fig.height=5, fig.width=5----
 gof <- HLfit(obs=rhc$RHC, pred=ps.stab.ATE$ps, n.bins=50, bin.method = "quantiles", plot.bin.size=FALSE)
 
 ## ----label=better, fig.align="center", fig.cap="Checking goodness-of-fit of a PS model with selection of significant covariates.", fig.height=5, fig.width=5----
 ind <- ps.stab.ATE$summary.glm$coefficients[,4]<0.05
-ps.stab.ATE.2 <- get.weights(df=rhc, A="RHC", C=covs.names[ind], wtype = "stab.ATE")
+form.txt <- paste0("RHC", " ~ ", paste0(covs.names[ind], collapse = "+"))
+trt.formula.1 <- as.formula(form.txt)
+ps.stab.ATE.2 <- get.weights(formula=trt.formula.1, data=rhc, wtype = "stab.ATE")
 gof <- HLfit(obs=rhc$RHC, pred=ps.stab.ATE.2$ps, n.bins=50, bin.method = "quantiles", plot.bin.size=FALSE)
 
 ## ---- fig.align="center", label=fig9, fig.cap="Checking overlap in PS distributions.", fig.height=5, fig.width=5----
@@ -170,7 +174,7 @@ ggplot(rhc.ps, aes(x = ps, fill = trt, color=trt)) +  geom_density(alpha = 0.5) 
           legend.background=element_rect(fill="transparent"))
 
 ## -----------------------------------------------------------------------------
-ps.overlap <- get.weights(df=rhc, A="RHC", C=covs.names, wtype = "overlap")
+ps.overlap <- get.weights(formula=trt.formula, data=rhc, wtype = "overlap")
 rhc.ps <- rhc.ps %>%   mutate(overlap.w = ps.overlap$w)
 
 ## ---- fig.align="center", label=fig10, fig.width=6.5, fig.height=8, message=FALSE, warning=FALSE, fig.cap="Testing covariate balance of the PS model with all covariates."----
@@ -183,7 +187,7 @@ suppressWarnings(love.plot(RHC ~ covs, data=rhc.ps,
           title = "Comparing balancing weights") + scale_fill_npg() + scale_color_npg())
 
 ## ----figcompare, label=figcompare, fig.align="center", fig.width=6.5, fig.height=8,  message=FALSE, warning=FALSE, fig.cap="Testing covariate balance of the PS model with selection of significant covariates."----
-ps.overlap.2 <- get.weights(df=rhc, A="RHC", C=covs.names[ind], wtype = "overlap")
+ps.overlap.2 <- get.weights(formula=trt.formula.1, data=rhc, wtype = "overlap")
 rhc.ps <- rhc.ps %>% mutate(ps.2 = ps.stab.ATE.2$ps, stab.ATE.w.2 = ps.stab.ATE.2$w,
                          overlap.w.2 = ps.overlap.2$w)
 covs <- subset(rhc.ps, select = covs.names)
@@ -274,28 +278,28 @@ ggplot(rhc.ps, aes(x = overlap.w, fill = trt, color=trt)) +
 ## -----------------------------------------------------------------------------
 # overlap weights========================:
 # Nonparametric estimation:
-res.overlap <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
-                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50, seed=17, parallel = FALSE) # The small number of bootstrap replications (nbs.rep=80) was chosen for illustration purposes.  
+res.overlap <- fit.nonpar(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
+                          wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50, seed=17, parallel = FALSE) # The small number of bootstrap replications (nbs.rep=50) was chosen for illustration purposes.  
 # Cox-based estimation:
-res.cox.overlap <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+res.cox.overlap <- fit.cox(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
                           wtype="overlap", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50, seed=17, parallel = FALSE)
 
 # stab.ATE weights==========================:
 # Nonparametric estimation:
-res.stab.ATE <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+res.stab.ATE <- fit.nonpar(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
                           wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                           seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.stab.ATE <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+res.cox.stab.ATE <- fit.cox(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
                           wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                           seed=17, parallel = FALSE)
 # unadjusted analysis========================:
 # Nonparametric estimation:
-res.un <- fit.nonpar(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+res.un <- fit.nonpar(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
                           wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                      seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.un <- fit.cox(df=rhc, X="Time", E="E", A="RHC", C=covs.names, 
+res.cox.un <- fit.cox(df=rhc, X="Time", E="E", trt.formula=trt.formula, 
                           wtype="unadj", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=50,
                       seed=17, parallel = FALSE)
 
@@ -544,11 +548,11 @@ ggplot(df, aes(x=time, y=CumPr, color=TRT, fill=TRT, shape=TRT)) +
 
 ## -----------------------------------------------------------------------------
 # nonparametric:
-res.30 <- fit.nonpar(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names,
+res.30 <- fit.nonpar(df=rhc_full, X="T.death.30", E="D.30", trt.formula=trt.formula,
                      wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
                      seed=17, parallel = FALSE)
 # Cox-based estimation:
-res.cox.30 <- fit.cox(df=rhc_full, X="T.death.30", E="D.30", A="RHC", C=covs.names,
+res.cox.30 <- fit.cox(df=rhc_full, X="T.death.30", E="D.30", trt.formula=trt.formula,
                       wtype="stab.ATE", cens=0, conf.level=0.95, bs=TRUE, nbs.rep=80,
                       seed=17, parallel = FALSE)
 

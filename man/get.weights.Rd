@@ -4,10 +4,16 @@
 \alias{get.weights}
 \title{Fitting a logistic regression model for propensity scores and estimating weights}
 \usage{
-get.weights(df, A, C, wtype = "stab.ATE", case.w = NULL)
+get.weights(formula, data, A, C = NULL, wtype = "unadj", case.w = NULL)
 }
 \arguments{
-\item{df}{a data frame that includes a treatment indicator \code{A}  and covariates \code{C}.}
+\item{formula}{a formula expression, of the form \code{response ~ predictors}.
+The \code{response} is a binary treatment/exposure variable,
+for which a logistic regression model (a  Propensity Scores model) will be fit using \code{glm}.
+See the documentation of \code{glm} and \code{formula} for details. As an alternative to specifying \code{formula},
+arguments \code{A} and \code{C}, defined below, can be specified.}
+
+\item{data}{a data frame that includes a treatment indicator \code{A} and covariates \code{C} appearing in \code{formula}.}
 
 \item{A}{a character specifying the name of the treatment/exposure variable.
 It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
@@ -20,8 +26,10 @@ that will estimate treatment effects in the raw (observed) data.}
 
 \item{wtype}{a character string variable indicating the type of weights that will define the target
 population for which the ATE will be estimated.
-The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
-Other possible values are "ATE", "ATT", "ATC", and "overlap".
+The default is "unadj" - this will not adjust for possible
+treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+in data from a randomized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 See Table 1 from Li, Morgan, and Zaslavsky (2018).}
 
 \item{case.w}{a vector of case weights.}
@@ -67,7 +75,9 @@ X <- ifelse(TRT==1, cf.m.T, cf.s.T)
 E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 covs.names <- c("c1", "c2")
 data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+trt.formula <- as.formula(form.txt)
+wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 par(new=TRUE)
 hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))

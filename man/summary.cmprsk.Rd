@@ -63,7 +63,9 @@ E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 covs.names <- c("c1", "c2")
 data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 # Nonparametric estimation:
-res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+trt.formula <- as.formula(form.txt)
+res.ATE <- fit.nonpar(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 # summarizing results on the Risk Difference for event=2
 fit.summary <- summary(object=res.ATE, event = 2, estimand="RD")
 head(fit.summary)

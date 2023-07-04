@@ -35,7 +35,8 @@
 {
   n = nrow(bh)
   # bh$hazard is a cumulative hazard
-  hazdiff = c(bh$hazard[1], apply(cbind(bh$hazard[1:(n-1)],bh$hazard[2:n]),1, diff))
+#  hazdiff = c(bh$hazard[1], apply(cbind(bh$hazard[1:(n-1)],bh$hazard[2:n]),1, diff))
+  hazdiff = diff(c(0, bh$hazard))
   data.frame(time=bh$time, haz=hazdiff)
 }
 
@@ -45,7 +46,12 @@
 #' and requested weights. The estimated propensity scores can be used
 #' for further diagnostics, e.g. for testing a positivity assumption and covariate balance.
 #'
-#' @param df a data frame that includes a treatment indicator \code{A}  and covariates \code{C}.
+#' @param formula a formula expression, of the form \code{response ~ predictors}.
+#' The \code{response} is a binary treatment/exposure variable,
+#' for which a logistic regression model (a  Propensity Scores model) will be fit using \code{glm}.
+#' See the documentation of \code{glm} and \code{formula} for details. As an alternative to specifying \code{formula},
+#' arguments \code{A} and \code{C}, defined below, can be specified.
+#' @param data a data frame that includes a treatment indicator \code{A} and covariates \code{C} appearing in \code{formula}.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
 #' is assumed a treatment group, and \code{A}=0 a control group.
@@ -55,8 +61,10 @@
 #' that will estimate treatment effects in the raw (observed) data.
 #' @param wtype a character string variable indicating the type of weights that will define the target
 #' population for which the ATE will be estimated.
-#' The default is "stab.ATE" defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
-#' Other possible values are "ATE", "ATT", "ATC", and "overlap".
+#' The default is "unadj" - this will not adjust for possible
+#' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
+#' in data from a randomized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
 #' @param case.w a vector of case weights.
 #'
@@ -99,7 +107,9 @@
 #' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+#' trt.formula <- as.formula(form.txt)
+#' wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 #' par(new=TRUE)
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
@@ -107,38 +117,76 @@
 #' # please see our package vignette for practical examples
 #'
 #' @export
-get.weights <- function(df, A, C, wtype="stab.ATE", case.w=NULL)
+get.weights <- function(formula, data, A, C=NULL, wtype="unadj", case.w=NULL)
 {
-  form.txt <- paste(A, " ~ ", sep="")
-  p <- length(C) - 1
-  for (i in 1:p)
-    form.txt <- paste(form.txt, C[i], "+", sep="")
-  form.txt <- paste(form.txt, C[p+1], sep="")
-  form <- as.formula(form.txt)
+  if (missing("data"))
+  {
+        warning("Argument 'df' was deprecated. Use 'data' instead.")
+  }
 
-  wei <- NULL
-  trt <- df[[A]]
+  wei <- rep(1, dim(data)[1])
+  pscore <- NULL
+  summary.glm <- NULL
+  if (wtype!="unadj")
+  {
+      if (!missing("A") && missing("formula"))
+      {
+    #    warning("Arguments 'A' and 'C' are deprecated. Use 'formula' instead.
+    #              Argument 'formula' will be constructed from 'A' and 'C'.")
+        form.txt <- paste0(A, " ~ ", paste0(C, collapse = "+"))
+        formula <- as.formula(form.txt)
+        trt <- data[[A]]
+      }
+      else if (!missing("formula") && !missing("A"))
+      {
+        warning("Both 'formula' and ('A', 'C') were provided. The argument 'formula' is used.")
+        Call <- match.call(expand.dots = FALSE)
+        # obtaining trt and a data frame, the code was taken from glm:
+        mf <- match.call(expand.dots = FALSE)
+        m <- match(c("formula", "data"), names(mf), 0L)
+        mf <- mf[c(1L, m)]
+        mf$drop.unused.levels <- TRUE
+        mf[[1L]] <- quote(stats::model.frame)
+        mf <- eval(mf, parent.frame())
+#        data <- mf
+        trt <- model.response(mf, "any")
+      }
+    else if (!missing("formula") && missing("A"))
+    {
+      Call <- match.call(expand.dots = FALSE)
+      # obtaining trt and a data frame, the code was taken from glm:
+      mf <- match.call(expand.dots = FALSE)
+      m <- match(c("formula", "data"), names(mf), 0L)
+      mf <- mf[c(1L, m)]
+      mf$drop.unused.levels <- TRUE
+      mf[[1L]] <- quote(stats::model.frame)
+      mf <- eval(mf, parent.frame())
+#      data <- mf
+      trt <- model.response(mf, "any")
+    }
 
-  if (is.null(case.w))
-    case.w=rep(1, length(trt))
+    if (is.null(case.w))
+      case.w = rep(1, dim(data)[1])
 
-  suppressWarnings(p_logistic.fit <- glm(form, family = binomial(link = "logit"), data = df, weights=case.w) )
-  # computing the propensity scores:
-  pscore <- predict(p_logistic.fit, type = "response")
+    data$case.w <- case.w
+    suppressWarnings(p_logistic.fit <- glm(formula, family = binomial(link = "logit"), data = data, weights=case.w) )
+    # computing the propensity scores:
+    pscore <- predict(p_logistic.fit, type = "response")
+    summary.glm = summary(p_logistic.fit)
 
-  pr.1 <- sum(trt*case.w)/sum(case.w)
-  if (wtype=="stab.ATE")
-    wei <- pr.1*trt/pscore + (1-trt)*(1-pr.1)/(1-pscore)
-  if (wtype=="ATE")
-    wei <- trt/pscore + (1-trt)/(1-pscore)
-  if (wtype=="ATT")
-    wei <- trt + (1-trt)*pscore/(1-pscore)
-  if (wtype=="ATC")
-    wei <- trt*(1-pscore)/pscore + (1-trt)
-  if (wtype=="overlap")
-    wei <- trt*(1-pscore) + (1-trt)*pscore
-
-  list(wtype=wtype, ps=pscore, w=wei, summary.glm=summary(p_logistic.fit))
+    pr.1 <- sum(trt*case.w)/sum(case.w)
+    if (wtype=="stab.ATE")
+      wei <- pr.1*trt/pscore + (1-trt)*(1-pr.1)/(1-pscore)
+    if (wtype=="ATE")
+      wei <- trt/pscore + (1-trt)/(1-pscore)
+    if (wtype=="ATT")
+      wei <- trt + (1-trt)*pscore/(1-pscore)
+    if (wtype=="ATC")
+      wei <- trt*(1-pscore)/pscore + (1-trt)
+    if (wtype=="overlap")
+      wei <- trt*(1-pscore) + (1-trt)*pscore
+  }
+  list(wtype=wtype, ps=pscore, w=wei, summary.glm=summary.glm )
 }
 
 
@@ -240,10 +288,21 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
   trt <- df[[A]]
 
   res <- list()
-  ps.fit <- get.weights(df=df, A=A, C=C, wtype=wtype)
-  fit.w.1 <- survfit(Surv(time = X[trt==1], ev = as.numeric(E[trt==1]!=0) )~1, weights=ps.fit$w[trt==1])
+
+  if (wtype!="unadj" && !is.null(C))
+  {
+    form.txt <- paste0(A, " ~ ", paste0(C, collapse = "+"))
+    trt.formula <- as.formula(form.txt)
+    ps.fit <- get.weights(formula=trt.formula, data=df, wtype = wtype)
+    w <- ps.fit$w
+  }
+  else
+    w <- rep(1, nobs)
+
+#  ps.fit <- get.weights(df=df, A=A, C=C, wtype=wtype)
+  fit.w.1 <- survfit(Surv(time = X[trt==1], ev = as.numeric(E[trt==1]!=0) )~1, weights=w[trt==1])
   fit.unw.1 <- survfit(Surv(time = X[trt==1], ev = as.numeric(E[trt==1]!=0) )~1)
-  fit.w.0 <- survfit(Surv(time = X[trt==0], ev = as.numeric(E[trt==0]!=0) )~1, weights=ps.fit$w[trt==0])
+  fit.w.0 <- survfit(Surv(time = X[trt==0], ev = as.numeric(E[trt==0]!=0) )~1, weights=w[trt==0])
   fit.unw.0 <- survfit(Surv(time = X[trt==0], ev = as.numeric(E[trt==0]!=0) )~1)
 
   # trt.1
@@ -271,42 +330,42 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 }
 
 
+# based on survfit:
 # time is a vector of arbitrary time points
 .estimate.nonpar <- function(X, E, case.w, cens, time, E.set) # within one counterfactual world
 {
-  # overall survival:
-  all.ev <- as.numeric(E!=cens) # an indicator of any event
-  fit.all <- coxph(Surv(time=X, event=all.ev)~1, weights=case.w)
-  bh.all <- basehaz(fit.all)
-  OS <- exp(-bh.all$haz)
+  Ef <- factor(E, levels=c(cens, E.set))
+  fit.surv <- suppressWarnings( survfit(Surv(time=X, ev=Ef) ~ 1, weights=case.w))
 
   res.a <- list() # a list of results; time is common for all the events
   # event-specific quantities:
-  for (k in E.set)
+  for (k in 1:length(E.set))
   {
-    Ek <- as.numeric(E==k)
-
-    fit.k <- coxph(Surv(time = X, ev = Ek)~1, weights=case.w)
-    cum.bh.k <- basehaz(fit.k, centered=FALSE)
-    bh.k <- .base.haz.std(cum.bh.k)
-    cif.k <- cumsum(bh.k$haz * sapply(bh.k$time, .get.S, bh.all$time, OS))
-
-    CumHaz <- sapply(time, .get.CIF, cum.bh.k$time, cum.bh.k$haz)
-    CIF.k <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.k)
-    RMT.k <-  sapply(time, .get.RMT, time = bh.k$time, cuminc=cif.k)
-
-    res.a[[paste("Ev=", k, sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
+    CumHaz <- sapply(time, .get.CIF, time=fit.surv$time, cuminc=fit.surv$cumhaz[,k])
+    CIF.k <- sapply(time, .get.CIF, time=fit.surv$time, cuminc=fit.surv$pstate[,k+1])
+    RMT.k <-  sapply(time, .get.RMT, time=fit.surv$time, cuminc=fit.surv$pstate[,k+1])
+    res.a[[paste("Ev=", E.set[k], sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
   }
   res.a
 } # end of .estimate.nonpar
 
 
-.sequential.fit.nonpar <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.sequential.fit.nonpar <- function(formula, data, X, E, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[X]]
-  E <- df[[E]]
+  Call <- match.call(expand.dots = FALSE)
+  # obtaining trt and a data frame, the code was taken from glm:
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  trt <- model.response(mf, "any")
+
+  X <- data[[X]]
+  E <- data[[E]]
   nobs <- length(X)
-  trt <- df[[A]]
+#  trt <- df[[A]]
   time <- sort(unique(X[E!=cens]))
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
@@ -314,7 +373,7 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
   res <- list(time=time) # this is the only place where I'll keep the time
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype)
+    ps.fit <- get.weights(formula=formula, data=data, wtype=wtype)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
                               case.w =ps.fit$w[trt==0], cens=cens, time=time, E.set)
     est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
@@ -377,7 +436,7 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 
       if (wtype!="unadj")
       {
-        bs.ps.fit <- get.weights(df, A, C, wtype, case.w = bs.w)
+        bs.ps.fit <- get.weights(formula=formula, data=data, wtype=wtype, case.w = bs.w)
         bs.est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
                                      case.w=bs.w[trt==0]*bs.ps.fit$w[trt==0],
                                      cens=cens, time=time, E.set)
@@ -534,74 +593,114 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
   return(res)
 }
 
+
+
 # assumes PH across 2 counterfactual worlds...
 .estimate.cox <- function(X, E, trt, case.w, cens, time, E.set)
 {
+  ID <- 1:length(X)
+  Ef <- factor(E, levels=c(cens, E.set)) #, labels=c("Cens", "Ev1", "Ev2"))
+  #fit.surv <- suppressWarnings( survfit(Surv(time=X, ev=Ef) ~ 1, weights=case.w))
+  if (length(E.set)>1)
+    res.surv <- coxph(Surv(X, Ef) ~ trt, weights = case.w, id=ID)
+  else
+    res.surv <- coxph(Surv(X, E) ~ trt, weights = case.w, id=ID)
+  dummy <- data.frame(trt=c(1,0)) # trt=1, trt=0
+  csurv <- survfit(res.surv, newdata=dummy)
+#  surv.Ev1 <- csurv[,'Ev1']
+#  surv.Ev2 <- csurv[,'Ev2']
   res.a <- list() # a list of results; time is common for all the events
-  # estimate and save base.Haz.k and HR.k:
-  OS.1 <- OS.0 <- 0
-  for (k in E.set)
+  # event-specific quantities:
+  res.a$trt.1<- list()
+  res.a$trt.0<- list()
+  for (k in 1:length(E.set))
   {
-    Ek <- as.numeric(E==k)
-    fit.cox.k <- coxph(Surv(time = X, event = Ek) ~ trt , weights = case.w)
-    BaseCumHaz.k <- basehaz(fit.cox.k, centered = FALSE)
-    res.a[[paste("Ev=", k, sep="")]] <- list(logHR=fit.cox.k$coef,
-                                             bh=BaseCumHaz.k)
-    OS.0 <- OS.0 - sapply(time, .get.CIF, BaseCumHaz.k$time, BaseCumHaz.k$haz)
-    OS.1 <- OS.1 - sapply(time, .get.CIF, BaseCumHaz.k$time, BaseCumHaz.k$haz * exp(fit.cox.k$coef))
+    if (length(E.set)>1)
+    { # TRT=1:
+      CumHaz <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$cumhaz[,1,k])
+      CIF.k <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$pstate[,1,k+1])
+      RMT.k <-  sapply(time, .get.RMT, time=csurv$time, cuminc=csurv$pstate[,1,k+1])
+      res.a$trt.1[[paste("Ev=", E.set[k], sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
+      # TRT=0:
+      CumHaz <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$cumhaz[,2,k])
+      CIF.k <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$pstate[,2,k+1])
+      RMT.k <-  sapply(time, .get.RMT, time=csurv$time, cuminc=csurv$pstate[,2,k+1])
+      res.a$trt.0[[paste("Ev=", E.set[k], sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
+      # log.HR:
+      res.a$trt.eff[[paste("Ev=", E.set[k], sep="")]] <- res.surv$coefficients[k]
+    }
+    else
+    {
+      CumHaz <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$cumhaz[,1])
+      CIF.k <- sapply(time, .get.CIF, time=csurv$time, cuminc=1-csurv$surv[,1])
+      RMT.k <-  sapply(time, .get.RMT, time=csurv$time, cuminc=1-csurv$surv[,1])
+      res.a$trt.1[[paste("Ev=", E.set[k], sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
+      # TRT=0:
+      CumHaz <- sapply(time, .get.CIF, time=csurv$time, cuminc=csurv$cumhaz[,2])
+      CIF.k <- sapply(time, .get.CIF, time=csurv$time, cuminc=1-csurv$surv[,2])
+      RMT.k <-  sapply(time, .get.RMT, time=csurv$time, cuminc=1-csurv$surv[,2])
+      res.a$trt.0[[paste("Ev=", E.set[k], sep="")]] <- list(CumHaz=CumHaz, CIF=CIF.k, RMT=RMT.k)
+      # log.HR:
+      res.a$trt.eff[[paste("Ev=", E.set[k], sep="")]] <- res.surv$coefficients[k]
+    }
   }
-  # OS=event-free survival in each of the trt arms at time=time
-  res.a$OS <- list(time=time, OS.trt.0=exp(OS.0), OS.trt.1=exp(OS.1))
   res.a
 } # end of .estimate.cox
 
 
-.sequential.fit.cox <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.sequential.fit.cox <- function(formula, data, X, E, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[X]]
-  E <- df[[E]]
+  Call <- match.call(expand.dots = FALSE)
+  # obtaining trt and a data frame, the code was taken from glm:
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  trt <- model.response(mf, "any")
+
+  X <- data[[X]]
+  E <- data[[E]]
   nobs <- length(X)
-  trt <- df[[A]]
+  #  trt <- df[[A]]
   time <- sort(unique(X[E!=cens]))
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
-  res <- list(time=time)
+  res <- list(time=time) # this is the only place where I'll keep the time
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype)
+    ps.fit <- get.weights(formula=formula, data=data, wtype=wtype)
     est <- .estimate.cox(X=X, E=E, trt=trt, case.w =ps.fit$w, cens=cens, time=time, E.set=E.set)
   }
   else
-    est <- .estimate.cox(X=X, E=E, trt=trt, case.w=rep(1, nobs), cens=cens, time=time, E.set=E.set)
+  {
+    un.w <- rep(1, nobs)
+    est <- .estimate.cox(X=X, E=E, trt=trt, case.w =un.w, cens=cens, time=time, E.set=E.set)
+  }
 
+  res$trt.0 <- est$trt.0 # save point estimates in the trt world 0
+  res$trt.1 <- est$trt.1 # save point estimates in the trt world 1
+
+  # calculate and save trt effect measures:
   for (k in E.set)
   {
-    # CumHaz:
-    time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
-    res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
-      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz)
-    res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
-      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
+    # calculate log(CumHaz1/CumHaz0)
+#    b <- log(est.1[[paste("Ev=", k, sep="")]]$CumHaz) -
+#      log(est.0[[paste("Ev=", k, sep="")]]$CumHaz) # under PH, this is beta=log(HR_TRT)
+    # without PH, it is log(HR_1(t)/HR_0(t))
+    log.HR <- est$trt.eff[[paste("Ev=", k, sep="")]]
+    names(log.HR) <- NULL
 
-    # CIF:
-    bh.k <- .base.haz.std(est[[paste("Ev=", k, sep="")]]$bh)
-    cif.0.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.0) * bh.k$haz)
-    cif.1.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.1) * bh.k$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
-    res$trt.0[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.0.k)
-    res$trt.1[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.1.k)
-    # RMT:
-    res$trt.0[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.0.k)
-    res$trt.1[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.1.k)
+    CIF.1 <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF
+    CIF.0 <- res$trt.0[[paste("Ev=", k, sep="")]]$CIF
+    RMT.1 <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT
+    RMT.0 <- res$trt.0[[paste("Ev=", k, sep="")]]$RMT
 
-    RD <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF - res$trt.0[[paste("Ev=", k, sep="")]]$CIF
-    RR <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF / res$trt.0[[paste("Ev=", k, sep="")]]$CIF
-    ATE.RMT <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT - res$trt.0[[paste("Ev=", k, sep="")]]$RMT
-    log.CumHazR <- est[[paste("Ev=", k, sep="")]]$logHR
-    names(log.CumHazR) <- NULL
-    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.CumHazR,
-                                                   RD=RD, RR=RR,
-                                                   ATE.RMT=ATE.RMT)
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.HR,
+                                                   RD=CIF.1-CIF.0, RR=CIF.1/CIF.0,
+                                                   ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
 
   if (bs)
@@ -628,48 +727,53 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
       set.seed(bs_seeds[i])
       bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
       bs.w <- bs.w/mean(bs.w)
+
       if (wtype!="unadj")
       {
-        bs.ps.fit <- get.weights(df, A, C, wtype, case.w = bs.w)
+        bs.ps.fit <- get.weights(formula=formula, data=data, wtype=wtype, case.w = bs.w)
         bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w*bs.ps.fit$w, cens=cens, time=time, E.set=E.set)
+        bs.est.0 <- bs.est$trt.0
+        bs.est.1 <- bs.est$trt.1
+        # bs.est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
+        #                              case.w=bs.w[trt==0]*bs.ps.fit$w[trt==0],
+        #                              cens=cens, time=time, E.set)
+        # bs.est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
+        #                              case.w=bs.w[trt==1]*bs.ps.fit$w[trt==1],
+        #                              cens=cens, time=time, E.set)
       }
       else
-        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w =bs.w, cens=cens, time=time, E.set=E.set)
+      {
+        bs.est <- .estimate.cox(X=X, E=E, trt=trt, case.w=bs.w, cens=cens, time=time, E.set=E.set)
+        bs.est.0 <- bs.est$trt.0
+        bs.est.1 <- bs.est$trt.1
+        # bs.est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
+        #                              case.w=bs.w[trt==0],
+        #                              cens=cens, time=time, E.set)
+        # bs.est.1 <- .estimate.nonpar(X=X[trt==1], E=E[trt==1],
+        #                              case.w=bs.w[trt==1],
+        #                              cens=cens, time=time, E.set)
+      }
 
       # accumulate the results
       for (k in E.set)
-      {
-        # CumHaz:
-        bs.time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
-        bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]][i,] <-
-          sapply(time, .get.CIF, bs.time.k,
-                 bs.est[[paste("Ev=", k, sep="")]]$bh$haz)
-        bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]][i,] <-
-          sapply(time, .get.CIF, bs.time.k,
-                 bs.est[[paste("Ev=", k, sep="")]]$bh$haz * exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
-        bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]][i] <- bs.est[[paste("Ev=", k, sep="")]]$logHR
-
+      { # CumHaz
+#        bs.b <- log(bs.est.1[[paste("Ev=", k, sep="")]]$CumHaz) -
+#          log(bs.est.0[[paste("Ev=", k, sep="")]]$CumHaz) # calculate log(CumHaz1/CumHaz0)
+        bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]][i,] <- bs.est.0[[paste("Ev=", k, sep="")]]$CumHaz
+        bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$CumHaz
+        bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]][i] <- bs.est$trt.eff[[paste("Ev=", k, sep="")]]
         # CIF
-        bs.bh.k <- .base.haz.std(bs.est[[paste("Ev=", k, sep="")]]$bh)
-        bs.cif.0.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.0) * bs.bh.k$haz)
-        bs.cif.1.k <- cumsum(sapply(bs.bh.k$time, .get.S, bs.est$OS$time, bs.est$OS$OS.trt.1) * bs.bh.k$haz *
-                               exp(bs.est[[paste("Ev=", k, sep="")]]$logHR))
-        bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
-                                                              cuminc=bs.cif.0.k)
-        bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.CIF, time=bs.bh.k$time,
-                                                              cuminc=bs.cif.1.k)
-        bs.CIF$RD[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] -
-          bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
-        bs.CIF$RR[[paste("Ev=", k, sep="")]][i,] <- bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] /
-          bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,]
-
+        bs.CIF$trt.0[[paste("Ev=", k, sep="")]][i,] <- bs.est.0[[paste("Ev=", k, sep="")]]$CIF
+        bs.CIF$trt.1[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$CIF
+        bs.CIF$RD[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$CIF -
+          bs.est.0[[paste("Ev=", k, sep="")]]$CIF
+        bs.CIF$RR[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$CIF/
+          bs.est.0[[paste("Ev=", k, sep="")]]$CIF
         # RMT
-        bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
-                                                              cuminc=bs.cif.0.k)
-        bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] <- sapply(time, .get.RMT, time=bs.bh.k$time,
-                                                              cuminc=bs.cif.1.k)
-        bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] -
-          bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,]
+        bs.RMT$trt.0[[paste("Ev=", k, sep="")]][i,] <- bs.est.0[[paste("Ev=", k, sep="")]]$RMT
+        bs.RMT$trt.1[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT
+        bs.RMT$ATE[[paste("Ev=", k, sep="")]][i,] <- bs.est.1[[paste("Ev=", k, sep="")]]$RMT -
+          bs.est.0[[paste("Ev=", k, sep="")]]$RMT
       }
       if (verbose) setTxtProgressBar(pb, i)
     }
@@ -694,25 +798,25 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.CI.U"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
+      # res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <-
+      #   apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, quantile, prob=alpha/2, na.rm=TRUE)
+      # res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <-
+      #   apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, quantile, prob=1-alpha/2, na.rm=TRUE)
       log.CumHazR.CI.L <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=alpha/2, na.rm=TRUE)
       names(log.CumHazR.CI.L) <- NULL
       res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.L"]] <- log.CumHazR.CI.L
       log.CumHazR.CI.U <- quantile(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], prob=1-alpha/2, na.rm=TRUE)
       names(log.CumHazR.CI.U) <- NULL
       res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.CI.U"]] <- log.CumHazR.CI.U
-
       # SE:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
       res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz.SE"]] <-
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
+#      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <-
+#        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, sd, na.rm=TRUE)
       SD <- sd(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.SE"]] <- SD
-
-      # pvalue for log.CumHazR
-      pvalue <- 2*pnorm(-abs(res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR"]])/SD)
-      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.pvalue"]] <- pvalue
-
       # bs.avg:
       res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz.bs.avg"]] <-
         apply(bs.CumHaz$trt.0[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
@@ -720,6 +824,11 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
         apply(bs.CumHaz$trt.1[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
       res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.bs.avg"]] <-
         mean(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], na.rm=TRUE)
+#        apply(bs.CumHaz$logRatio[[paste("Ev=", k, sep="")]], 2, mean, na.rm=TRUE)
+      # pvalue for log.CumHazR
+      pvalue <- 2*pnorm(-abs(res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR"]])/SD)
+      names(pvalue) <- NULL
+      res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.pvalue"]] <- pvalue
 
       # B. CIFs :::::::::::::::::::::::::::::::::::::::::::::::
       # CI:
@@ -796,6 +905,8 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
   class(res) <- "cmprsk"
   return(res)
 }
+
+
 
 #' Returns point estimates and \code{conf.level}\% confidence intervals corresponding to a specific time point
 #'
@@ -905,16 +1016,18 @@ get.numAtRisk <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0)
 #' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+#' trt.formula <- as.formula(form.txt)
+#' wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 #' par(new=TRUE)
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 #' # Nonparametric estimation:
-#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 #' nonpar.pe <- get.pointEst(res.ATE, 0.5)
 #' nonpar.pe$trt.eff[[1]]$RD
 #' # Cox-based estimation:
-#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 #' cox.pe <- get.pointEst(res.cox.ATE, 0.5)
 #' cox.pe$trt.eff[[1]]$RD
 #'
@@ -995,11 +1108,11 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   return(point.res)
 }
 
-.nonpar.run <- function(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w)
+.nonpar.run <- function(df, X, E, formula, wtype, cens, E.set, time, trt,nobs, case.w)
 {
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype, case.w = case.w)
+    ps.fit <- get.weights(formula=formula, data=df, wtype=wtype, case.w = case.w)
     est.0 <- .estimate.nonpar(X=X[trt==0], E=E[trt==0],
                               case.w = case.w[trt==0]*ps.fit$w[trt==0],
                               cens=cens, time=time, E.set)
@@ -1038,62 +1151,68 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   res
 }
 
-.cox.run <- function(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs,case.w)
+
+
+.cox.run <- function(df, X, E, formula, wtype, cens, E.set,time, trt,nobs,case.w)
 {
   if (wtype!="unadj")
   {
-    ps.fit <- get.weights(df, A, C, wtype,case.w = case.w)
+    ps.fit <- get.weights(formula=formula, data=df, wtype=wtype, case.w = case.w)
     est <- .estimate.cox(X=X, E=E, trt=trt, case.w = case.w*ps.fit$w, cens=cens, time=time, E.set=E.set)
   }
   else
     est <- .estimate.cox(X=X, E=E, trt=trt, case.w=case.w, cens=cens, time=time, E.set=E.set)
 
   res <- list(time=time)
+  res$trt.0 <- est$trt.0 # save point estimates in the trt world 0
+  res$trt.1 <- est$trt.1 # save point estimates in the trt world 1
+
+  # calculate and save trt effect measures:
   for (k in E.set)
   {
-    # CumHaz:
-    time.k <- est[[paste("Ev=", k, sep="")]]$bh$time
-    res$trt.0[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
-      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz)
-    res$trt.1[[paste("Ev=", k, sep="")]][["CumHaz"]] <-
-      sapply(time, .get.CIF, time.k, est[[paste("Ev=", k, sep="")]]$bh$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
+    # calculate log(CumHaz1/CumHaz0)
+    #    b <- log(est.1[[paste("Ev=", k, sep="")]]$CumHaz) -
+    #      log(est.0[[paste("Ev=", k, sep="")]]$CumHaz) # under PH, this is beta=log(HR_TRT)
+    # without PH, it is log(HR_1(t)/HR_0(t))
+    log.HR <- est$trt.eff[[paste("Ev=", k, sep="")]]
+    names(log.HR) <- NULL
 
-    # CIF:
-    bh.k <- .base.haz.std(est[[paste("Ev=", k, sep="")]]$bh)
-    cif.0.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.0) * bh.k$haz)
-    cif.1.k <- cumsum(sapply(bh.k$time, .get.S, est$OS$time, est$OS$OS.trt.1) * bh.k$haz * exp(est[[paste("Ev=", k, sep="")]]$logHR))
-    res$trt.0[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.0.k)
-    res$trt.1[[paste("Ev=", k, sep="")]][["CIF"]] <- sapply(time, .get.CIF, time=bh.k$time, cuminc=cif.1.k)
-    # RMT:
-    res$trt.0[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.0.k)
-    res$trt.1[[paste("Ev=", k, sep="")]][["RMT"]] <- sapply(time, .get.RMT, time=bh.k$time, cuminc=cif.1.k)
+    CIF.1 <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF
+    CIF.0 <- res$trt.0[[paste("Ev=", k, sep="")]]$CIF
+    RMT.1 <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT
+    RMT.0 <- res$trt.0[[paste("Ev=", k, sep="")]]$RMT
 
-    RD <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF - res$trt.0[[paste("Ev=", k, sep="")]]$CIF
-    RR <- res$trt.1[[paste("Ev=", k, sep="")]]$CIF / res$trt.0[[paste("Ev=", k, sep="")]]$CIF
-    ATE.RMT <- res$trt.1[[paste("Ev=", k, sep="")]]$RMT - res$trt.0[[paste("Ev=", k, sep="")]]$RMT
-
-    log.CumHazR=est[[paste("Ev=", k, sep="")]]$logHR
-    names(log.CumHazR) <- NULL
-    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.CumHazR,
-                                                   RD=RD, RR=RR,
-                                                   ATE.RMT=ATE.RMT)
+    res$trt.eff[[paste("Ev=", k, sep="")]] <- list(log.CumHazR=log.HR,
+                                                   RD=CIF.1-CIF.0, RR=CIF.1/CIF.0,
+                                                   ATE.RMT=RMT.1-RMT.0)
   } # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   res
 }
 
+
 # Parallel Cox Fit
-.parallel.fit.cox <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.parallel.fit.cox <- function(formula, data, X, E, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[X]]
-  E <- df[[E]]
+  Call <- match.call(expand.dots = FALSE)
+  # obtaining trt and a data frame, the code was taken from glm:
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  trt <- model.response(mf, "any")
+
+  X <- data[[X]]
+  E <- data[[E]]
   nobs <- length(X)
-  trt <- df[[A]]
+  #  trt <- df[[A]]
   time <- sort(unique(X[E!=cens]))
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
   #  res <- list(time=time)
-  res <- .cox.run(df, X, E, A, C, wtype, cens, E.set,time, trt,nobs, case.w = rep(1,nobs))
+  res <- .cox.run(data, X, E, formula=formula, wtype, cens, E.set,time, trt,nobs, case.w = rep(1,nobs))
   # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
   {
@@ -1120,7 +1239,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
-        bs_aggregates <- .cox.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
+        bs_aggregates <- .cox.run(data, X, E, formula=formula, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
         if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates # by default the results are combined in a list
       }
@@ -1176,6 +1295,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 
       # pvalue
       pvalue <- 2*pnorm(-abs(res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR"]])/SD)
+      names(pvalue) <- NULL
       res$trt.eff[[paste("Ev=", k, sep="")]][["log.CumHazR.pvalue"]] <- pvalue
 
       # bs.avg:
@@ -1262,18 +1382,28 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
   }
 }
 
-.parallel.fit.nonpar <- function(df, X, E, A, C, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
+.parallel.fit.nonpar <- function(formula, data, X, E, wtype, cens, conf.level, bs, nbs.rep, seed, verbose)
 {
-  X <- df[[X]]
-  E <- df[[E]]
+  Call <- match.call(expand.dots = FALSE)
+  # obtaining trt and a data frame, the code was taken from glm:
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  trt <- model.response(mf, "any")
+
+  X <- data[[X]]
+  E <- data[[E]]
   nobs <- length(X)
-  trt <- df[[A]]
+#  trt <- df[[A]]
   time <- sort(unique(X[E!=cens]))
   E.set <- sort(unique(E))
   E.set <- E.set[E.set!=cens]
 
   #  res <- list(time=time) # this is the only place where I'll keep the time
-  res <- .nonpar.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = rep(1,nobs))
+  res <- .nonpar.run(data, X, E, formula=formula, wtype, cens, E.set,time, trt,nobs, case.w = rep(1,nobs))
 
   # res is a list with 4 fields: time, trt.0, trt.0, trt.eff
   if (bs)
@@ -1302,7 +1432,7 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
         set.seed(bs_seeds[i])
         bs.w <- pmin(rexp(nobs,1), 5) # nobs = our sample size
         bs.w <- bs.w/mean(bs.w)
-        bs_aggregates <- .nonpar.run(df, X, E, A, C, wtype, cens, E.set,time,trt,nobs, case.w = bs.w)
+        bs_aggregates <- .nonpar.run(data, X, E, formula=formula, wtype, cens, E.set,time, trt,nobs, case.w = bs.w)
         if (verbose) setTxtProgressBar(pb, i)
         bs_aggregates
       }          # df, T, E, A, C, wtype, cens, E.set,time,trt,nobs,X,case.w
@@ -1451,6 +1581,12 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' a treatment indicator \code{A}  and covariates \code{C}.
 #' @param X a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
+#' @param trt.formula a formula expression, of the form \code{response ~ predictors}.
+#' The \code{response} is a binary treatment/exposure variable,
+#' for which a logistic regression model (a  Propensity Scores model) will be fit using \code{glm}.
+#' See the documentation of \code{glm} and \code{formula} for details. As an alternative to specifying \code{formula},
+#' arguments \code{A} and \code{C}, defined below, can be specified.
+#' Either \code{formula} or a pair of \code{A} and \code{C} must be specified.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
 #' is assumed a treatment group, and \code{A}=0 a control group.
@@ -1614,11 +1750,13 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' form.txt <- paste0("TRT", " ~ ", paste0(covs.names, collapse = "+"))
+#' trt.formula <- as.formula(form.txt)
+#' wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 #' # Cox-based estimation:
-#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' res.cox.ATE <- fit.cox(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 #' cox.pe <- get.pointEst(res.cox.ATE, 0.5)
 #' cox.pe$trt.eff[[1]]$RD
 #'
@@ -1629,12 +1767,31 @@ get.pointEst <- function(cmprsk.obj, timepoint) # assumes timepoint is a scalar
 #'
 #'
 #' @export
-fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
+fit.cox <- function(df, X, E, trt.formula, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
 
   get_os <- function(){
     platform <- .Platform$OS.type
     return(platform)
   }
+
+  if (!missing("A") && missing("trt.formula"))
+  {
+    warning("Arguments 'A' and 'C' will be deprecated. Use 'trt.formula' instead.
+                  Argument 'trt.formula' will be constructed from 'A' and 'C'.")
+    form.txt <- paste0(A, " ~ ", paste0(C, collapse = "+"))
+    trt.formula <- as.formula(form.txt)
+  }
+  else if (!missing("A") && !missing("trt.formula"))
+  {
+    warning("Both 'trt.formula' and ('A', 'C') were provided. The argument 'trt.formula' is used.")
+  }
+  else if (missing("A") && missing("trt.formula"))
+  {
+    warning("Argument 'trt.formula' has to be provided.")
+    return(NULL)
+  }
+
+
   if(bs == TRUE && parallel == TRUE){
 
     # if windows (snow)
@@ -1660,12 +1817,14 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
       doParallel::registerDoParallel(cl=cluster)
     }
 
-    res <- .parallel.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    res <- .parallel.fit.cox(formula=trt.formula, data = df, X = X, E = E, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
     parallel::stopCluster(cluster)
   }
   else
-  res <- .sequential.fit.cox(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
-  res
+  {
+    res <- .sequential.fit.cox(formula=trt.formula, data = df, X = X, E = E, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+  }
+    res
 }
 
 #' Nonparametric estimation of ATE corresponding to the target population
@@ -1685,6 +1844,12 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' a treatment indicator \code{A}  and covariates \code{C}.
 #' @param X a character string specifying the name of the time-to-event variable in \code{df}.
 #' @param E a character string specifying the name of the "event type" variable in \code{df}.
+#' @param trt.formula a formula expression, of the form \code{response ~ predictors}.
+#' The \code{response} is a binary treatment/exposure variable,
+#' for which a logistic regression model (a  Propensity Scores model) will be fit using \code{glm}.
+#' See the documentation of \code{glm} and \code{formula} for details. As an alternative to specifying \code{formula},
+#' arguments \code{A} and \code{C}, defined below, can be specified.
+#' Either \code{formula} or a pair of \code{A} and \code{C} must be specified.
 #' @param A a character specifying the name of the treatment/exposure variable.
 #' It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
 #' is assumed a treatment group, and \code{A}=0 a control group.
@@ -1696,7 +1861,7 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' population for which the ATE will be estimated.
 #' The default is "unadj" - this will not adjust for possible
 #' treatment selection bias and will not use propensity scores weighting. It can be used, for example,
-#' in data from a randized controlled trial (RCT) where there is no need for emulation of baseline randomization.
+#' in data from a randomized controlled trial (RCT) where there is no need for emulation of baseline randomization.
 #' Other possible values are "stab.ATE", "ATE", "ATT", "ATC" and "overlap".
 #' See Table 1 from Li, Morgan, and Zaslavsky (2018).
 #' "stab.ATE" is defined as P(A=a)/P(A=a|C=c) - see Hernán et al. (2000).
@@ -1844,11 +2009,13 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-#' wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+#' form.txt <- paste0("TRT", " ~ ", paste0(covs.names, collapse = "+"))
+#' trt.formula <- as.formula(form.txt)
+#' wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 #' hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 #' hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 #' # Nonparametric estimation:
-#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 #' nonpar.pe <- get.pointEst(res.ATE, 0.5)
 #' nonpar.pe$trt.eff[[1]]$RD
 #'
@@ -1858,12 +2025,30 @@ fit.cox <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95,
 #' @references M.A. Hernán, B. Brumback, and J.M. Robins. 2000. Marginal structural models and to estimate the causal effect of zidovudine on the survival of HIV-positive men. Epidemiology, 11 (5): 561-570.
 #'
 #' @export
-fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE){
-
+fit.nonpar <- function(df, X, E, trt.formula, A, C=NULL, wtype="unadj", cens=0, conf.level=0.95, bs=FALSE, nbs.rep=400, seed=17, parallel = FALSE, verbose=FALSE)
+{
   get_os <- function(){
     platform <- .Platform$OS.type
     return(platform)
   }
+
+  if (!missing("A") && missing("trt.formula"))
+  {
+    warning("Arguments 'A' and 'C' will be deprecated. Use 'trt.formula' instead.
+                  Argument 'trt.formula' will be constructed from 'A' and 'C'.")
+    form.txt <- paste0(A, " ~ ", paste0(C, collapse = "+"))
+    trt.formula <- as.formula(form.txt)
+ }
+  else if (!missing("A") && !missing("trt.formula"))
+  {
+    warning("Both 'trt.formula' and ('A', 'C') were provided. The argument 'trt.formula' is used.")
+  }
+  else if (missing("A") && missing("trt.formula"))
+  {
+    warning("Argument 'trt.formula' has to be provided.")
+    return(NULL)
+  }
+
   if(bs == TRUE && parallel == TRUE){
 
     # if windows (snow)
@@ -1888,11 +2073,11 @@ fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
       cluster <- parallel::makeCluster(spec=num_cores)
       doParallel::registerDoParallel(cl=cluster)
     }
-    res <- .parallel.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    res <- .parallel.fit.nonpar(formula=trt.formula, data = df, X = X, E = E, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
     parallel::stopCluster(cl=cluster)
   }
   else
-    res <- .sequential.fit.nonpar(df = df, X = X, E = E, A = A, C = C, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
+    res <- .sequential.fit.nonpar(formula=trt.formula, data = df, X = X, E = E, wtype = wtype, cens = cens, conf.level = conf.level, bs = bs, nbs.rep = nbs.rep, seed = seed, verbose=verbose)
   res
 }
 
@@ -1951,7 +2136,9 @@ fit.nonpar <- function(df, X, E, A, C=NULL, wtype="unadj", cens=0, conf.level=0.
 #' covs.names <- c("c1", "c2")
 #' data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
 #' # Nonparametric estimation:
-#' res.ATE <- fit.nonpar(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+#' form.txt <- paste0("TRT", " ~ ", paste0(c("c1", "c2"), collapse = "+"))
+#' trt.formula <- as.formula(form.txt)
+#' res.ATE <- fit.nonpar(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 #' # summarizing results on the Risk Difference for event=2
 #' fit.summary <- summary(object=res.ATE, event = 2, estimand="RD")
 #' head(fit.summary)

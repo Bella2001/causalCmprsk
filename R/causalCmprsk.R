@@ -26,7 +26,7 @@
 #' @import survival
 #' @import inline
 #'
-#' @importFrom stats pnorm qnorm quantile sd var rexp as.formula binomial glm predict
+#' @importFrom stats pnorm qnorm quantile sd var rexp as.formula binomial glm predict model.response
 #' @importFrom methods is
 #' @importFrom utils txtProgressBar setTxtProgressBar globalVariables
 #' @importFrom parallel detectCores makeCluster stopCluster

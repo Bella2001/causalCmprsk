@@ -1,14 +1,14 @@
 Package: causalCmprsk
 Type: Package
 Title: Nonparametric and Cox-Based Estimation of Average Treatment Effects in Competing Risks
-Version: 1.1.0
+Version: 2.0.0
 Authors@R: c(person("Bella", "Vakulenko-Lagun", email ="blagun@stat.haifa.ac.il", role = c("aut", "cre")),
     person("Colin", "Magdamo", role = c("aut")),
     person("Marie-Laure", "Charpignon", role = c("aut")),
     person("Bang", "Zheng", role = c("aut")),
     person("Mark", "Albers", role = c("aut")),
     person("Sudeshna", "Das", role = c("aut")))
-Description: The package implements estimation of average treatment effects (ATE) of point interventions on time-to-event outcomes with K competing risks (K can be 1). The method uses propensity scores weighting for emulation of baseline randomization, which is described in Charpignon et al. (2022) <https://doi.org/10.1038/s41467-022-35157-w>.
+Description: Estimation of average treatment effects (ATE) of point interventions on time-to-event outcomes with K competing risks (K can be 1). The method uses propensity scores and inverse probability weighting for emulation of baseline randomization, which is described in Charpignon et al. (2022) <doi:10.1038/s41467-022-35157-w>.
 License: GPL (>= 2)
 Encoding: UTF-8
 Depends:

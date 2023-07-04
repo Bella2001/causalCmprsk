@@ -8,6 +8,7 @@ fit.cox(
   df,
   X,
   E,
+  trt.formula,
   A,
   C = NULL,
   wtype = "unadj",
@@ -27,6 +28,13 @@ a treatment indicator \code{A}  and covariates \code{C}.}
 \item{X}{a character string specifying the name of the time-to-event variable in \code{df}.}
 
 \item{E}{a character string specifying the name of the "event type" variable in \code{df}.}
+
+\item{trt.formula}{a formula expression, of the form \code{response ~ predictors}.
+The \code{response} is a binary treatment/exposure variable,
+for which a logistic regression model (a  Propensity Scores model) will be fit using \code{glm}.
+See the documentation of \code{glm} and \code{formula} for details. As an alternative to specifying \code{formula},
+arguments \code{A} and \code{C}, defined below, can be specified.
+Either \code{formula} or a pair of \code{A} and \code{C} must be specified.}
 
 \item{A}{a character specifying the name of the treatment/exposure variable.
 It is assumed that \code{A} is a numeric binary indicator with 0/1 values, where \code{A}=1
@@ -208,11 +216,13 @@ X <- ifelse(TRT==1, cf.m.T, cf.s.T)
 E <- ifelse(TRT==1, cf.m.E, cf.s.E)
 covs.names <- c("c1", "c2")
 data <- data.frame(X=X, E=E, TRT=TRT, c1=c1, c2=c2)
-wei <- get.weights(data, "TRT", covs.names, wtype = "overlap")
+form.txt <- paste0("TRT", " ~ ", paste0(covs.names, collapse = "+"))
+trt.formula <- as.formula(form.txt)
+wei <- get.weights(formula=trt.formula, data=data, wtype = "overlap")
 hist(wei$ps[data$TRT==1], col="red", breaks = seq(0,1,0.05))
 hist(wei$ps[data$TRT==0], col="blue", breaks = seq(0,1,0.05))
 # Cox-based estimation:
-res.cox.ATE <- fit.cox(df=data, X="X", E="E", A="TRT", C=covs.names, wtype="stab.ATE")
+res.cox.ATE <- fit.cox(df=data, X="X", E="E", trt.formula=trt.formula, wtype="stab.ATE")
 cox.pe <- get.pointEst(res.cox.ATE, 0.5)
 cox.pe$trt.eff[[1]]$RD
 
